@@ -5,9 +5,9 @@ A python package for interacting with a webcam for gaze tracking &amp; pupillome
 
 ##Software dependencies
 
- - numpy (numpy.org)
- - scipy (scipy.org)
- - OpenCV (opencv.org)
+ - numpy (http://numpy.org)
+ - scipy (http://scipy.org)
+ - OpenCV (http://opencv.org)
  - billiard (https://github.com/celery/billiard)
 
 
