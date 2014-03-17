@@ -192,9 +192,9 @@ class workerClass:
 		import cv2
 		import scipy.ndimage.filters
 		import pytracker
-		faceCascade = cv2.CascadeClassifier('./pytracker/haarcascade_frontalface_alt2.xml')
-		eyeLeftCascade = cv2.CascadeClassifier('./pytracker/LEye18x12.1.xml')
-		eyeRightCascade = cv2.CascadeClassifier('./pytracker/REye18x12.1.xml')
+		faceCascade = cv2.CascadeClassifier('./pytracker/Resources/haarcascade_frontalface_alt2.xml')
+		eyeLeftCascade = cv2.CascadeClassifier('./pytracker/Resources/LEye18x12.1.xml')
+		eyeRightCascade = cv2.CascadeClassifier('./pytracker/Resources/REye18x12.1.xml')
 		while True:
 			if not qTo.empty():
 				message = qTo.get()
@@ -331,7 +331,7 @@ class trackerClass:
 			getTime = time.time
 		#initialize font
 		sdl2.sdlttf.TTF_Init()
-		font = sdl2.sdlttf.TTF_OpenFont('pytracker/DejaVuSans.ttf', camRes[1]/previewDownsize/10)
+		font = sdl2.sdlttf.TTF_OpenFont('./pytracker/Resources/DejaVuSans.ttf', camRes[1]/previewDownsize/10)
 		#initialize video
 		sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
 		window = sdl2.ext.Window("test",size=(camRes[0]/previewDownsize,camRes[1]/previewDownsize),position=(0,0),flags=sdl2.SDL_WINDOW_SHOWN)
@@ -340,9 +340,9 @@ class trackerClass:
 		sdl2.ext.fill(windowSurf.contents,sdl2.pixels.SDL_Color(r=255, g=255, b=255, a=255))
 		window.refresh()
 		if numWorkers==0:
-			faceCascade = cv2.CascadeClassifier('./pytracker/haarcascade_frontalface_alt2.xml')
-			eyeLeftCascade = cv2.CascadeClassifier('./pytracker/LEye18x12.1.xml')
-			eyeRightCascade = cv2.CascadeClassifier('./pytracker/REye18x12.1.xml')
+			faceCascade = cv2.CascadeClassifier('./pytracker/Resources/haarcascade_frontalface_alt2.xml')
+			eyeLeftCascade = cv2.CascadeClassifier('./pytracker/Resources/LEye18x12.1.xml')
+			eyeRightCascade = cv2.CascadeClassifier('./pytracker/Resources/REye18x12.1.xml')
 		else:
 			#initialize workers
 			qToWorkers = billiard.Queue()
