@@ -141,6 +141,12 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 	def rescaleBiggestHaar(detected,scale,addToX=0,addToY=0):
 		x,y,w,h = detected[numpy.argmax([numpy.sqrt(w*w+h*h) for x,y,w,h in detected])]
 		return [x*scale+addToX,y*scale+addToY,w*scale,h*scale]
+	def exitSafely():
+		camera.stop()
+		print 'camera stopped'
+		qFrom.put('done')
+		print 'tracker stopped'
+		sys.exit()
 	#initialize variables
 	lastTime = 0
 	dotList = []
@@ -156,18 +162,14 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 		if not qTo.empty():
 			message = qTo.get()
 			if message=='quit':
-				camera.stop()
-				print 'camera stopped'
-				qFrom.put('done')
-				print 'tracker stopped'
-				sys.exit()
+				exitSafely()
 		#process input
 		sdl2.SDL_PumpEvents()
 		for event in sdl2.ext.get_events():
 			if event.type==sdl2.SDL_KEYDOWN:
 				key = sdl2.SDL_GetKeyName(event.key.keysym.sym).lower()
 				if key=='escape': #exit
-					exit_safely()
+					exitSafely()
 				elif key=='0': #start defining dots
 					waitingforHaar = False
 					doDots = True#not doDots
