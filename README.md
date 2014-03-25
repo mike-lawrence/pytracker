@@ -1,6 +1,6 @@
 #pytracker
 
-A python package for interacting with a webcam for gaze tracking &amp; pupillometry. I'm a cognitive scientist, so my emphasis is on something that can be easily integrated into cognitive science experiments, but portions of the code may be of interest to game developers too.
+A python package for interacting with a webcam for gaze tracking &amp; pupillometry. I'm a cognitive scientist, so my emphasis is on something that can be easily integrated into cognitive science experiments (including multi-core implementation to avoid slowing down your stim presentation process), but portions of the code may be of interest to game developers too.
 
 Currently only has accounting for head movements in x,y,z planes only; translations in pitch, roll and yaw are on the to-do list. 
 
