@@ -69,16 +69,16 @@ class dotObj:
 			self.radius = (self.ellipse[1][0]+self.ellipse[1][1])/4
 			self.radiusPixel = int(self.radius)
 	def checkSearch(self):
-		self.radii.append(self.radius2)
 		self.medianRadius = numpy.median(self.radii)
 		self.critRadius = 10*((numpy.median((self.radii-self.medianRadius)**2))**.5)
-		if len(self.radii)>=30:
-				#fid diameter is 6mm, so range from .1 to 12mm
+		if len(self.radii)<30:
+			self.radii.append(self.radius2)
+		else:
+			#fid diameter is 6mm, so range from .1 to 12mm
 			if (self.radius2<(1/6)) or (self.radius2>2) or (self.radius2<(self.medianRadius - self.critRadius)) or (self.radius2>(self.medianRadius + self.critRadius)): #(radius2<(fid.radius/6.0)) or (radius2>fid.radius*2) or 
 				self.lost = True
-				self.lostCount += 1
 			else:
-				self.lostCount = 0
+				self.radii.append(self.radius2)
 			if len(self.radii)>=300:
 				self.radii.pop()
 	def makeRelativeToFid(self,fid):
@@ -86,14 +86,17 @@ class dotObj:
 		self.y2 = (self.y-fid.y)/fid.radius
 		self.radius2 = self.radius/fid.radius
 	def checkSD(self,img,fid):
-		obsSD = numpy.std(self.cropImage(img=img,cropSize=5*fid.radiusPixel)[0])
-		self.SDs.append(obsSD)
+		self.obsSD = numpy.std(self.cropImage(img=img,cropSize=5*fid.radiusPixel)[0])
 		self.medianSD = numpy.median(self.SDs)
 		self.critSD = 10*((numpy.median((self.SDs-self.medianSD)**2))**.5)
-		if len(self.SDs)>=30:
-			if (obsSD<(self.medianSD - self.critSD)):
+		if len(self.SDs)<30:
+			self.SDs.append(self.obsSD)	
+		else:
+			if (self.obsSD<(self.medianSD - self.critSD)):
 				self.blink = True
-				self.SDs.pop(-1);
+				self.SDs.pop(-1)
+			else:
+				self.SDs.append(self.obsSD)
 			if len(self.SDs)>=300:
 				self.SDs.pop()
 	def update(self,img,fid=None):
@@ -115,7 +118,7 @@ class dotObj:
 					self.checkSearch()
 					if self.lost:
 						self.xPixel,self.yPixel,self.radiusPixel = lastPixels
-		if self.lost:
+		if self.lost and not self.blink:
 			self.lostCount += 1
 		else:
 			self.lostCount = 0
