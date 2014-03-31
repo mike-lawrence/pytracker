@@ -39,4 +39,4 @@ if __name__ == '__main__':
 			if message=='done':
 				break
 ```
-Press '0' to begin tracking once the video preview window appears.
+Press '0' to begin tracking once the video preview window appears. Press '9' to start calibration, and 'q' to accept calibration when validation results are presented (else calibration will restart).
