@@ -74,8 +74,9 @@ class dotObj:
 		if len(self.radii)<30:
 			self.radii.append(self.radius2)
 		else:
-			#fid diameter is 6mm, so range from .1 to 12mm
-			if (self.radius2<(1/6)) or (self.radius2>2) or (self.radius2<(self.medianRadius - self.critRadius)) or (self.radius2>(self.medianRadius + self.critRadius)): #(radius2<(fid.radius/6.0)) or (radius2>fid.radius*2) or 
+			#fid diameter is 6mm, so range from 1mm to 12mm
+			#if (self.radius2<(1/6)) or (self.radius2>2) or (self.radius2<(self.medianRadius - self.critRadius)) or (self.radius2>(self.medianRadius + self.critRadius)):
+			if (self.radius2<(1/6)) or (self.radius2>2):
 				self.lost = True
 			else:
 				self.radii.append(self.radius2)

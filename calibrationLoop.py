@@ -106,6 +106,7 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 	
 	#define a function that will kill everything safely
 	def exitSafely():
+		qFrom.put(['stopQueing',getTime()])
 		sdl2.ext.quit()
 		sys.exit()
 	

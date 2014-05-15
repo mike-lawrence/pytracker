@@ -95,7 +95,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 	doneCalibration = False
 	doSounds = True
 	soundPlaying = False
-	queuDataToParent = False
+	queueDataToParent = False
 	#initialize camera
 	camera = pytracker.cameraClass(camIndex=camIndex,camRes=camRes,timestampMethod=timestampMethod)
 	camera.start()
@@ -118,6 +118,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 					doHaar = True #triggers haar detection for next frame
 					dotList = [] 
 				elif key=='9':
+					doneCalibration = False
 					calibrator = pytracker.calibrationClass(timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,calibrationDotSizeInDegrees,manualCalibrationOrder)
 					calibrator.start()
 					calibrating = True
@@ -187,7 +188,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 			blink = False
 			saccade = False
 			if len(dotList)==3:
-				print [dotList[1].blink,dotList[1].lost,dotList[1].lostCount,dotList[2].blink,dotList[2].lost,dotList[2].lostCount,dotList[1].obsSD,dotList[1].medianSD,dotList[1].critSD,dotList[1].radius2,dotList[1].medianRadius,dotList[1].critRadius,dotList[2].obsSD,dotList[2].medianSD,dotList[2].critSD,dotList[2].radius2,dotList[2].medianRadius,dotList[2].critRadius]
+				# print [dotList[1].blink,dotList[1].lost,dotList[1].lostCount,dotList[2].blink,dotList[2].lost,dotList[2].lostCount,dotList[1].obsSD,dotList[1].medianSD,dotList[1].critSD,dotList[1].radius2,dotList[1].medianRadius,dotList[1].critRadius,dotList[2].obsSD,dotList[2].medianSD,dotList[2].critSD,dotList[2].radius2,dotList[2].medianRadius,dotList[2].critRadius]
 				if dotList[0].lost:
 					dotList = []
 					print 'fid lost'
@@ -199,15 +200,16 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 					blink = True
 				elif doneCalibration:
 					xLoc,yLoc = getGazeLoc(dotList,calibrationCoefs,lastLocs)
-					print [xLoc,yLoc]
+					#print [xLoc,yLoc]
 					if len(lastLocs)==2:
 						# locDiff = ( ((xLoc-lastLocs[0])**2) + ((yLoc-lastLocs[1])**2) )**.5
 						locDiff = abs(xLoc-lastLocs[0])
 						if locDiff>saccadeAlertSizeInDegrees:
 							saccade = True
 					lastLocs = [xLoc,yLoc]
-					if queuDataToParent:
-						qFrom.put([imageTime,xLoc,yLoc,saccade,dotList[1].lost,dotList[2].lost,dotList[1].blink,dotList[2].blink])
+					if queueDataToParent:
+						qFrom.put(['eyeData',str.format('{0:.3f}',imageTime),xLoc,yLoc,saccade,blink,dotList[1].lost,dotList[2].lost,dotList[1].blink,dotList[2].blink])
+						print [str.format('{0:.3f}',imageTime),xLoc,yLoc,saccade,blink,dotList[1].lost,dotList[2].lost,dotList[1].blink,dotList[2].blink]
 			if doSounds:
 				if not soundPlaying:
 					if blink:
@@ -265,7 +267,8 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 						calibrator.stop()
 						del calibrator
 						lastLocs = []
-						print calibrationCoefs
+						qFrom.put(message)
+						queueDataToParent = True
 					else: 
 						print message
 				if checkCalibrationStopTime:
