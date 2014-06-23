@@ -1,4 +1,4 @@
-def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetectionScale,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,manualCalibrationOrder,calibrationDotSizeInDegrees,saccadeAlertSizeInDegrees):
+def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale,eyeDetectionScale,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,mirrorDownSize,manualCalibrationOrder,calibrationDotSizeInDegrees,saccadeAlertSizeInDegrees):
 	import numpy
 	import cv2
 	import scipy.ndimage.filters
@@ -43,11 +43,12 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 		import time
 		getTime = time.time
 	#initialize font
+	fontSize = camRes[1]/previewDownsize/10
 	sdl2.sdlttf.TTF_Init()
-	font = sdl2.sdlttf.TTF_OpenFont('./pytracker/Resources/DejaVuSans.ttf', camRes[1]/previewDownsize/10)
+	font = sdl2.sdlttf.TTF_OpenFont('./pytracker/Resources/DejaVuSans.ttf', fontSize)
 	#initialize video
 	sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
-	previewWindow = sdl2.ext.Window("test",size=(camRes[0]/previewDownsize,camRes[1]/previewDownsize),position=(0,0),flags=sdl2.SDL_WINDOW_SHOWN)
+	previewWindow = sdl2.ext.Window("test",size=(camRes[0]/previewDownsize,camRes[1]/previewDownsize),position=previewLoc,flags=sdl2.SDL_WINDOW_SHOWN)
 	previewWindowSurf = sdl2.SDL_GetWindowSurface(previewWindow.window)
 	previewWindowArray = sdl2.ext.pixels3d(previewWindowSurf.contents)
 	sdl2.ext.fill(previewWindowSurf.contents,sdl2.pixels.SDL_Color(r=255, g=255, b=255, a=255))
@@ -57,9 +58,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 	eyeRightCascade = cv2.CascadeClassifier('./pytracker/Resources/cascades/REye18x12.1.xml')
 	def exitSafely():
 		camera.stop()
-		print 'camera stopped'
 		qFrom.put('done')
-		print 'tracker stopped'
 		sys.exit()
 	def rescaleBiggestHaar(detected,scale,addToX=0,addToY=0):
 		x,y,w,h = detected[numpy.argmax([numpy.sqrt(w*w+h*h) for x,y,w,h in detected])]
@@ -68,23 +67,42 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 		xCoefLeft,xCoefRight,yCoefLeft,yCoefRight = coefs
 		if dotList[1].lost:
 			xLoc = xCoefRight[0] + xCoefRight[1]*dotList[2].x2 + xCoefRight[2]*dotList[2].y2 + xCoefRight[3]*dotList[2].y2*dotList[2].x2
-			yLoc = yCoefRight[0] + yCoefRight[1]*dotList[2].y2 + yCoefRight[2]*dotList[2].y2 + yCoefRight[3]*dotList[2].y2*dotList[2].y2
+			yLoc = yCoefRight[0] + yCoefRight[1]*dotList[2].y2 + yCoefRight[2]*dotList[2].y2 + yCoefRight[3]*dotList[2].y2*dotList[2].x2
 		elif dotList[2].lost:
 			xLoc = xCoefLeft[0] + xCoefLeft[1]*dotList[1].x2 + xCoefLeft[2]*dotList[1].y2 + xCoefLeft[3]*dotList[2].y2*dotList[1].x2
-			yLoc = yCoefLeft[0] + yCoefLeft[1]*dotList[1].y2 + yCoefLeft[2]*dotList[1].y2 + yCoefLeft[3]*dotList[2].y2*dotList[1].y2
+			yLoc = yCoefLeft[0] + yCoefLeft[1]*dotList[1].y2 + yCoefLeft[2]*dotList[1].y2 + yCoefLeft[3]*dotList[2].y2*dotList[1].x2
 		elif dotList[1].lost and dotList[2].lost:
 			xLoc = last[0]
 			yLoc = last[1]
 		else:
 			xLocLeft = xCoefLeft[0] + xCoefLeft[1]*dotList[1].x2 + xCoefLeft[2]*dotList[1].y2 + xCoefLeft[3]*dotList[2].y2*dotList[1].x2
-			yLocLeft = yCoefLeft[0] + yCoefLeft[1]*dotList[1].y2 + yCoefLeft[2]*dotList[1].y2 + yCoefLeft[3]*dotList[2].y2*dotList[1].y2
+			yLocLeft = yCoefLeft[0] + yCoefLeft[1]*dotList[1].y2 + yCoefLeft[2]*dotList[1].y2 + yCoefLeft[3]*dotList[2].y2*dotList[1].x2
 			xLocRight = xCoefRight[0] + xCoefRight[1]*dotList[2].x2 + xCoefRight[2]*dotList[2].y2 + xCoefRight[3]*dotList[2].y2*dotList[2].x2
-			yLocRight = yCoefRight[0] + yCoefRight[1]*dotList[2].y2 + yCoefRight[2]*dotList[2].y2 + yCoefRight[3]*dotList[2].y2*dotList[2].y2
+			yLocRight = yCoefRight[0] + yCoefRight[1]*dotList[2].y2 + yCoefRight[2]*dotList[2].y2 + yCoefRight[3]*dotList[2].y2*dotList[2].x2
 			xLoc = (xLocLeft+xLocRight)/2
 			yLoc = (yLocLeft+yLocRight)/2
 			# print [xLoc,yLoc,dotList[1].x2,dotList[1].y2,dotList[2].x2,dotList[2].y2]
-		return [xLoc,yLoc]		
+		return [xLoc,yLoc]
+	autoTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Auto',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
+	manTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Manual',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
+	calTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Calibrate',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents	
+	blinkCriterion = .75
+	blinkTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,str(int(blinkCriterion*100)),sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
+	blinkSliderTop = int(autoTextSurf.h*2.5)
+	blinkSliderBottom = previewWindow.size[1]-int(calTextSurf.h*1.5)
+	blinkSliderSize = blinkSliderBottom - blinkSliderTop
+	blinkCriterionPosition = blinkSliderBottom - blinkSliderSize*blinkCriterion	
 	#initialize variables
+	saccadeSoundWaiting = False
+	lastSaccadeSoundTime = 0
+	autoBoxOn = False
+	manBoxOn = False
+	calBoxOn = False
+	mouseInAutoText = False
+	mouseInManText = False
+	mouseInCalText = False
+	mouseInBlinkText = False
+	blinkTextButtonDown = False
 	lastTime = 0
 	dotList = []
 	displayLagList = []
@@ -113,26 +131,43 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 				key = sdl2.SDL_GetKeyName(event.key.keysym.sym).lower()
 				if key=='escape': #exit
 					exitSafely()
-				elif key=='0': #start defining dots
-					waitingforHaar = False
-					doHaar = True #triggers haar detection for next frame
-					dotList = [] 
-				elif key=='9':
-					doneCalibration = False
-					calibrator = pytracker.calibrationClass(timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,calibrationDotSizeInDegrees,manualCalibrationOrder)
-					calibrator.start()
-					calibrating = True
-					checkCalibrationStopTime = False
-					queueDataToCalibrator = False
-				elif key=='8':
-					clickingForDots = True
-					clickingForFid = True
-					definingFidFinderBox = False
-					dotList = []
 			if event.type==sdl2.SDL_MOUSEMOTION:
 				if clickingForDots:
 					if definingFidFinderBox:
 						fidFinderBoxSize = abs(fidFinderBoxX - (previewWindow.size[0]-event.button.x) )
+				else:
+					autoBoxOn = False
+					manBoxOn = False
+					calBoxOn = False
+					mouseInAutoText = False
+					mouseInManText = False
+					mouseInCalText = False
+					mouseInBlinkText = False
+					if ( event.button.x > (previewWindow.size[0]-autoTextSurf.w) ) & ( event.button.x < previewWindow.size[0] ) & ( event.button.y > 0 ) & ( event.button.y < autoTextSurf.h ):
+						autoBoxOn = True
+						mouseInAutoText = True
+					elif ( event.button.x > (previewWindow.size[0]-manTextSurf.w) ) & ( event.button.x < previewWindow.size[0] ) & ( event.button.y > autoTextSurf.h ) & ( event.button.y < (autoTextSurf.h+manTextSurf.h) ):
+						manBoxOn = True
+						mouseInManText = True
+					elif ( event.button.x > (previewWindow.size[0]-calTextSurf.w) ) & ( event.button.x < previewWindow.size[0] ) & ( event.button.y > (previewWindow.size[1]-calTextSurf.h) ) & ( event.button.y < previewWindow.size[1] ):
+						calBoxOn = True
+						mouseInCalText = True
+					elif ( event.button.x > previewWindow.size[0]-fontSize-blinkTextSurf.w ) & ( event.button.x < previewWindow.size[0]-fontSize ) & ( event.button.y > blinkCriterionPosition-blinkTextSurf.h/2 ) & ( event.button.y < blinkCriterionPosition+blinkTextSurf.h/2 ) :
+						mouseInBlinkText = True
+						if blinkTextButtonDown:
+							blinkCriterion = ( ( blinkSliderBottom - event.button.y ) * 1.0 / blinkSliderSize )
+							if blinkCriterion>1:
+								blinkCriterion=1
+							elif blinkCriterion<0:
+								blinkCriterion=0
+							blinkTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,str(int(blinkCriterion*100)),sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
+							blinkCriterionPosition = blinkSliderBottom - blinkSliderSize*blinkCriterion
+							for i in range(len(dotList)):
+								dotList[i].blinkCriterion = blinkCriterion
+			if event.type==sdl2.SDL_MOUSEBUTTONUP:
+				if not clickingForDots:
+					if blinkTextButtonDown:
+						blinkTextButtonDown = False
 			if event.type==sdl2.SDL_MOUSEBUTTONDOWN:
 				if clickingForDots:
 					if clickingForFid:
@@ -145,13 +180,34 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 							definingFidFinderBox = False
 							clickingForFid = False
 							fidFinderBoxSize = abs(fidFinderBoxX - (previewWindow.size[0]-event.button.x) )
-							dotList.append(pytracker.dotObj.dotObj(isFid=True,xPixel=fidFinderBoxX * previewDownsize,yPixel=fidFinderBoxY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize))
+							dotList.append(pytracker.dotObj.dotObj(name='fid',isFid=True,xPixel=fidFinderBoxX * previewDownsize,yPixel=fidFinderBoxY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkCriterion))
 					else:
 						clickX = (previewWindow.size[0]-event.button.x)
 						clickY = event.button.y
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize))
-						if len(dotList)==3:
+						if len(dotList)==1:
+							dotList.append(pytracker.dotObj.dotObj(name = 'left',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkCriterion))
+						else:
+							dotList.append(pytracker.dotObj.dotObj(name = 'right',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkCriterion))
 							clickingForDots = False
+				else:
+					if mouseInBlinkText:
+						blinkTextButtonDown = True
+					elif mouseInAutoText:
+						waitingforHaar = False
+						doHaar = True #triggers haar detection for next frame
+						dotList = [] 
+					elif mouseInManText:
+						clickingForDots = True
+						clickingForFid = True
+						definingFidFinderBox = False
+						dotList = []
+					elif mouseInCalText:
+						doneCalibration = False
+						calibrator = pytracker.calibrationClass(timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,mirrorDownSize,calibrationDotSizeInDegrees,manualCalibrationOrder)
+						calibrator.start()
+						calibrating = True
+						checkCalibrationStopTime = False
+						queueDataToCalibrator = False
 		#check for images from the camera
 		if not camera.qFrom.empty():
 			imageNum,imageTime,image = camera.qFrom.get()
@@ -178,13 +234,13 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 						eyeLeftX,eyeLeftY,eyeLeftW,eyeLeftH = rescaleBiggestHaar(detected=detectedEyeLefts,scale=eyeDetectionScale,addToX=faceX,addToY=faceY)
 						eyeRightX,eyeRightY,eyeRightW,eyeRightH = rescaleBiggestHaar(detected=detectedEyeRights,scale=eyeDetectionScale,addToX=faceX+faceW/2,addToY=faceY)
 						#initialize fid
-						dotList.append(pytracker.dotObj.dotObj(isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4))
+						dotList.append(pytracker.dotObj.dotObj(isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=blinkCriterion))
 						#initialize left
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2))
+						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=blinkCriterion))
 						#initialize right
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2))
+						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=blinkCriterion))
 			for i in range(len(dotList)): #update the dots given the new image
-				dotList[i].update(img=image,fid=dotList[0])
+				dotList[i].update(img=image,imageNum=imageNum,fid=dotList[0])
 			blink = False
 			saccade = False
 			if len(dotList)==3:
@@ -198,6 +254,8 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 						dotList = []
 				elif dotList[1].blink and dotList[2].blink:
 					blink = True
+					if saccadeSoundWaiting:
+						saccadeSoundWaiting = False
 				elif doneCalibration:
 					xLoc,yLoc = getGazeLoc(dotList,calibrationCoefs,lastLocs)
 					#print [xLoc,yLoc]
@@ -206,20 +264,26 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 						locDiff = abs(xLoc-lastLocs[0])
 						if locDiff>saccadeAlertSizeInDegrees:
 							saccade = True
+							if not saccadeSoundWaiting:
+								if getTime()>(lastSaccadeSoundTime+1):
+									saccadeSoundWaiting = True
+									saccadeSoundWaitStart = getTime()
 					lastLocs = [xLoc,yLoc]
 					if queueDataToParent:
-						qFrom.put(['eyeData',str.format('{0:.3f}',imageTime),xLoc,yLoc,saccade,blink,dotList[1].lost,dotList[2].lost,dotList[1].blink,dotList[2].blink])
-						print [str.format('{0:.3f}',imageTime),xLoc,yLoc,saccade,blink,dotList[1].lost,dotList[2].lost,dotList[1].blink,dotList[2].blink]
+						qFrom.put(['eyeData',[str.format('{0:.3f}',imageTime),xLoc,yLoc,saccade,blink,dotList[1].lost,dotList[2].lost,dotList[1].blink,dotList[2].blink]])
 			if doSounds:
 				if not soundPlaying:
 					if blink:
 						sound = Sound('./pytracker/Resources/sounds/beep.wav')
 						sound.play()
 						soundPlaying = True
-					if saccade:
-						sound = Sound('./pytracker/Resources/sounds/stop.wav')
-						sound.play()
-						soundPlaying = True
+					if saccadeSoundWaiting:
+						if getTime()>(saccadeSoundWaitStart+.1):
+							lastSaccadeSoundTime = getTime()
+							saccadeSoundWaiting = False
+							sound = Sound('./pytracker/Resources/sounds/stop.wav')
+							sound.play()
+							soundPlaying = True
 				else:
 					if sound.doneYet():
 						soundPlaying = False
@@ -239,6 +303,15 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 					cv2.circle(image,(xPixel,yPixel),size,color=(0,0,255,255),thickness=1)
 				else:
 					cv2.circle(image,(xPixel,yPixel),size,color=(0,255,0,255),thickness=1)
+			if autoBoxOn:
+				# cv2.rectangle(image,(previewWindow.size[0]-autoTextSurf.w,0),(previewWindow.size[0],autoTextSurf.h),(0,255,0,255),1)
+				cv2.rectangle(image,(0,0),(autoTextSurf.w,autoTextSurf.h),(0,255,0,255),1)
+			if manBoxOn:
+				cv2.rectangle(image,(0,autoTextSurf.h),(manTextSurf.w,autoTextSurf.h+manTextSurf.h),(0,255,0,255),1)
+			if calBoxOn:
+				cv2.rectangle(image,(0,previewWindow.size[1]-calTextSurf.h),(calTextSurf.w,previewWindow.size[1]),(0,255,0,255),1)
+			cv2.rectangle(image,(0,blinkSliderTop),(fontSize,blinkSliderBottom),(255,0,0,255),1)
+			cv2.rectangle(image,(0,int(blinkCriterionPosition)-2),(fontSize,int(blinkCriterionPosition)+2),(255,0,0,255),-1)
 			image = numpy.rot90(image)
 			previewWindowArray[:,:,0:3] = image
 			frameToFrameTimeList.append(imageTime-lastTime)
@@ -249,7 +322,11 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 			if len(displayLagList)>30:
 				displayLagList.pop(0)
 				frameToFrameTimeList.pop(0)
-			timeSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,displayLag+'\r'+frameToFrameTime+'\r',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
+			sdl2.SDL_BlitSurface(autoTextSurf, None, previewWindowSurf, sdl2.SDL_Rect(previewWindow.size[0]-autoTextSurf.w,0,autoTextSurf.w,autoTextSurf.h))
+			sdl2.SDL_BlitSurface(manTextSurf, None, previewWindowSurf, sdl2.SDL_Rect(previewWindow.size[0]-manTextSurf.w,autoTextSurf.h,manTextSurf.w,manTextSurf.h))
+			sdl2.SDL_BlitSurface(calTextSurf, None, previewWindowSurf, sdl2.SDL_Rect(previewWindow.size[0]-calTextSurf.w,previewWindow.size[1]-calTextSurf.h,calTextSurf.w,calTextSurf.h))
+			sdl2.SDL_BlitSurface(blinkTextSurf, None, previewWindowSurf, sdl2.SDL_Rect(previewWindow.size[0]-fontSize-blinkTextSurf.w,int(blinkCriterionPosition-blinkTextSurf.h/2),blinkTextSurf.w,blinkTextSurf.h))
+			timeSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Lag: '+displayLag+'\r'+'f2f: '+frameToFrameTime+'\r',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
 			sdl2.SDL_BlitSurface(timeSurf, None, previewWindowSurf, sdl2.SDL_Rect(0,0,timeSurf.w,timeSurf.h))
 			previewWindow.refresh()
 			if calibrating:
@@ -267,7 +344,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,faceDetectionScale,eyeDetecti
 						calibrator.stop()
 						del calibrator
 						lastLocs = []
-						qFrom.put(message)
+						qFrom.put(['calibrationComplete',message])
 						queueDataToParent = True
 					else: 
 						print message

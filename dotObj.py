@@ -1,9 +1,11 @@
 import cv2
 import numpy
 import scipy.ndimage.filters
+import time
 
 class dotObj:
-	def __init__(self,isFid,xPixel,yPixel,radiusPixel):
+	def __init__(self,name,isFid,xPixel,yPixel,radiusPixel,blinkCriterion):
+		self.name = name
 		self.isFid = isFid
 		self.xPixel = xPixel
 		self.yPixel = yPixel
@@ -12,9 +14,14 @@ class dotObj:
 		self.radii = []
 		self.SDs = []
 		self.lostCount = 0
-	def getDarkEllipse(self,img,neighborhoodSize=3):
+		self.blinkCriterion = blinkCriterion
+	def getDarkEllipse(self,img,imageNum):
+		#if not self.isFid:
+		#	#cv2.imwrite(self.name + "_" + "%.2d" % imageNum + "_raw.png" , img)
 		try:
-			smoothedImg = cv2.GaussianBlur(img,(3,3),0)
+			smoothedImg = cv2.GaussianBlur(img,(11,11),0)
+			#if not self.isFid:
+			#	#cv2.imwrite(self.name + "_" + "%.2d" % imageNum + "_smoothed.png" , img)
 		except:
 			print 'cv2.GaussianBlur failed'
 			# cv2.imwrite('temp.png',img)
@@ -46,7 +53,7 @@ class dotObj:
 		yLo = self.yPixel - cropSize
 		yHi = self.yPixel + cropSize
 		return [img[yLo:yHi,xLo:xHi],xLo,yLo]
-	def search(self,img):
+	def search(self,img,imageNum):
 		if self.lost:
 			searchSize = 5
 		else:
@@ -55,7 +62,7 @@ class dotObj:
 			searchSize = 1
 			self.first = False
 		img,xLo,yLo = self.cropImage(img=img,cropSize=searchSize*self.radiusPixel)
-		self.ellipse = self.getDarkEllipse(img=img)
+		self.ellipse = self.getDarkEllipse(img=img,imageNum=imageNum)
 		if self.ellipse!=None:
 			self.ellipse = ((self.ellipse[0][0]+xLo,self.ellipse[0][1]+yLo),self.ellipse[1],self.ellipse[2])
 			self.lost = False
@@ -71,6 +78,7 @@ class dotObj:
 	def checkSearch(self):
 		self.medianRadius = numpy.median(self.radii)
 		self.critRadius = 10*((numpy.median((self.radii-self.medianRadius)**2))**.5)
+		#print [self.name, self.radius2,(self.radius2<(1/6)) , (self.radius2>2)]
 		if len(self.radii)<30:
 			self.radii.append(self.radius2)
 		else:
@@ -89,29 +97,29 @@ class dotObj:
 	def checkSD(self,img,fid):
 		self.obsSD = numpy.std(self.cropImage(img=img,cropSize=5*fid.radiusPixel)[0])
 		self.medianSD = numpy.median(self.SDs)
-		self.critSD = 10*((numpy.median((self.SDs-self.medianSD)**2))**.5)
+		self.critSD = self.medianSD*self.blinkCriterion
+		#print [self.name,self.obsSD,self.medianSD,self.critSD,self.blinkCriterion]
 		if len(self.SDs)<30:
 			self.SDs.append(self.obsSD)	
 		else:
-			if (self.obsSD<(self.medianSD - self.critSD)):
+			if (self.obsSD<self.critSD):
 				self.blink = True
-				self.SDs.pop(-1)
 			else:
 				self.SDs.append(self.obsSD)
 			if len(self.SDs)>=300:
 				self.SDs.pop()
-	def update(self,img,fid=None):
+	def update(self,img,imageNum,fid=None):
 		lastPixels = [self.xPixel,self.yPixel,self.radiusPixel]
 		self.blink = False
 		self.lost = True
 		if self.isFid:
-			self.search(img=img)
+			self.search(img=img,imageNum=imageNum)
 		else:
 			self.checkSD(img=img,fid=fid)
 			if self.blink:
 				self.xPixel,self.yPixel,self.radiusPixel = lastPixels
 			else:
-				self.search(img=img)
+				self.search(img=img,imageNum=imageNum)
 				if self.lost:
 					self.xPixel,self.yPixel,self.radiusPixel = lastPixels
 				else:

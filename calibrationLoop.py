@@ -1,4 +1,4 @@
-def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,calibrationDotSizeInDegrees,manualCalibrationOrder):
+def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,mirrorDownSize,calibrationDotSizeInDegrees,manualCalibrationOrder):
 	# 	class dummyQTo:
 	# 		def empty(self):
 	# 			return True
@@ -46,7 +46,7 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 	#initialize video
 	sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
 	sdl2.SDL_SetHint("SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS","0")
-	mirrorDisplay = sdl2.ext.Window("Mirror", size=(stimDisplayRes[0]/2,stimDisplayRes[1]/2),position=mirrorDisplayPosition,flags=sdl2.SDL_WINDOW_SHOWN)
+	mirrorDisplay = sdl2.ext.Window("Mirror", size=(stimDisplayRes[0]/mirrorDownSize,stimDisplayRes[1]/mirrorDownSize),position=mirrorDisplayPosition,flags=sdl2.SDL_WINDOW_SHOWN)
 	mirrorDisplaySurf = sdl2.SDL_GetWindowSurface(mirrorDisplay.window)
 	mirrorDisplayArray = sdl2.ext.pixels3d(mirrorDisplaySurf.contents)
 	# stimDisplay = sdl2.ext.Window("Calibration",size=stimDisplayRes,position=stimDisplayPosition,flags=sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_FULLSCREEN_DESKTOP|sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC)
@@ -67,7 +67,7 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 	calibrationDotSize = int(calibrationDotSizeInDegrees*PPD)
 	#initialize font
 	sdl2.sdlttf.TTF_Init()
-	font = sdl2.sdlttf.TTF_OpenFont('./pytracker/Resources/DejaVuSans.ttf', int(PPD))
+	font = sdl2.sdlttf.TTF_OpenFont('./pytracker/Resources/DejaVuSans.ttf', int(PPD)*2)
 	########
 	# Define some useful colors for SDL2
 	########
@@ -310,13 +310,18 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 		yCoefLeft = numpy.linalg.lstsq(calibrationData[:,leftCols], calibrationData[:,1])[0]
 		yCoefRight = numpy.linalg.lstsq(calibrationData[:,rightCols], calibrationData[:,1])[0]
 		xError,yError,totError = getErrors(calibrationData,xCoefLeft,xCoefRight,yCoefLeft,yCoefRight,leftCols,rightCols)
-		showMessage('Calibration results:\nx = '+str(xError)+'\ny = '+str(yError)+'\nz = '+str(totError))
+		showMessage('Calibration results:\nx = '+str(xError)+'\ny = '+str(yError)+'\nz = '+str(totError)+'\nPress any key to validate calibration.')
 		validationData = getCalibrationData()
 		xError,yError,totError = getErrors(validationData,xCoefLeft,xCoefRight,yCoefLeft,yCoefRight,leftCols,rightCols)
-		response = showMessage('Validation results:\nx = '+str(xError)+'\ny = '+str(yError)+'\nz = '+str(totError))
-		if response[0]=='q':
-			qFrom.put(['calibrationCoefs',[xCoefLeft,xCoefRight,yCoefLeft,yCoefRight]])
-			done = True
+		done2 = False
+		while not done2:
+			response = showMessage('Validation results:\nx = '+str(xError)+'\ny = '+str(yError)+'\nz = '+str(totError)+'\nExperimenter: Press "a" to accept calibration, or "r" to repeat calibration.')
+			if response[0]=='a':
+				qFrom.put(['calibrationCoefs',[xCoefLeft,xCoefRight,yCoefLeft,yCoefRight]])
+				done = True
+				done2 = True
+			elif response[0]=='r':
+				done2 = True
 	exitSafely()
 # 	xFit = numpy.polyfit(obs[:,0],exp[:,0],2)
 # 	yFit = numpy.polyfit(obs[:,1],exp[:,1],2)
