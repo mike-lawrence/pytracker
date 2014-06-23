@@ -26,11 +26,24 @@ Finally, the code expects that the user has a black dot on their head, placed be
 if __name__ == '__main__':
 	import pytracker
 	import time
-	camIndex = 1
+	camIndex = 0
 	camRes = [1920,1080]
 	previewDownsize = 2
-	timestampMethod = 0
-	tracker = pytracker.trackerClass(camIndex=camIndex,camRes=camRes,previewDownsize=previewDownsize,timestampMethod=timestampMethod)
+	faceDetectionScale = 4
+	eyeDetectionScale = 2
+	timestampMethod = 2
+	viewingDistance = 53.0
+	stimDisplayWidth = 59.5
+	stimDisplayRes = [1024,768]
+	stimDisplayPosition = [0,0]
+	mirrorDisplayPosition = [1025,0] #i.e. put the window mirroring the stim display on the next monitor
+	mirrorDownSize = 2
+	previewLoc = [1024,0] #i.e. put the window mirroring the stim display on the next monitor
+	manualCalibrationOrder = False
+	calibrationDotSizeInDegrees = 1
+	saccadeAlertSizeInDegrees = 3
+	tracker = pytracker.trackerClass(camIndex=camIndex,camRes=camRes,previewDownsize=previewDownsize,previewLoc=previewLoc,faceDetectionScale=faceDetectionScale,eyeDetectionScale=eyeDetectionScale,timestampMethod=timestampMethod,viewingDistance=viewingDistance,stimDisplayWidth=stimDisplayWidth,stimDisplayRes=stimDisplayRes,stimDisplayPosition=stimDisplayPosition,mirrorDisplayPosition=mirrorDisplayPosition,mirrorDownSize=mirrorDownSize,manualCalibrationOrder = manualCalibrationOrder, calibrationDotSizeInDegrees=calibrationDotSizeInDegrees,saccadeAlertSizeInDegrees=saccadeAlertSizeInDegrees)
+	tracker.start()
 	tracker.start()
 	while True:
 		time.sleep(1)
@@ -39,4 +52,15 @@ if __name__ == '__main__':
 			if message=='done':
 				break
 ```
-Press '0' to begin tracking once the video preview window appears. Press '9' to start calibration, and 'q' to accept calibration when validation results are presented (else calibration will restart).
+
+If the full face is visible, you should be able to click "Auto" to automatically acquire the pupils and fiduciary mark. If the "Auto" fails, click "Manual" then: 
+1. click the center of the fiduciary mark
+2. move the mouse until the cursor is outside the fiduciary mark (you'll see a circle that expands around the mark)
+3. click again to acquire the fiduciary mark
+4. click the center of the left pupil
+5. click the center of the right pupil
+
+Regardless of whether using "Auto" or "Manual", you should instruct the subject to stare straight ahead and refrain from blinking or moving during the acquisition. 
+
+Following acquisition, ask the subject to blink intermittently and move their eyes intermittently. If either the blinks aren't detected or the eyes get lost during movements, try moving the slider on the right of the preview window to different values.
+
