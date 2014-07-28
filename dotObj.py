@@ -2,6 +2,7 @@ import cv2
 import numpy
 import scipy.ndimage.filters
 import time
+import PupilTrackerPythonWrapper
 
 class dotObj:
 	def __init__(self,name,isFid,xPixel,yPixel,radiusPixel,blinkCriterion):
@@ -10,71 +11,41 @@ class dotObj:
 		self.xPixel = xPixel
 		self.yPixel = yPixel
 		self.radiusPixel = radiusPixel
-		self.first = True
+		self.radius = int(self.radiusPixel)
 		self.radii = []
 		self.SDs = []
 		self.lostCount = 0
 		self.blinkCriterion = blinkCriterion
-	def getDarkEllipse(self,img,imageNum):
-		#if not self.isFid:
-		#	#cv2.imwrite(self.name + "_" + "%.2d" % imageNum + "_raw.png" , img)
-		try:
-			smoothedImg = cv2.GaussianBlur(img,(11,11),0)
-			#if not self.isFid:
-			#	#cv2.imwrite(self.name + "_" + "%.2d" % imageNum + "_smoothed.png" , img)
-		except:
-			print 'cv2.GaussianBlur failed'
-			# cv2.imwrite('temp.png',img)
-			return None
-		try:
-			dataMin = scipy.ndimage.filters.minimum_filter(smoothedImg, 3)
-		except:
-			print 'scipy.ndimage.filters.minimum_filter failed'
-			# cv2.imwrite('temp.png',img)
-			return None
-		if dataMin!=None:
-			try:
-				minLocs = numpy.where(dataMin<(numpy.min(dataMin)+numpy.std(dataMin)))
-			except:
-				print 'numpy.where failed'
-				# cv2.imwrite('temp.png',img)
-				return None
-			if len(minLocs[0])>=5:
-				try:
-					ellipse = cv2.fitEllipse(numpy.reshape(numpy.column_stack((minLocs[1],minLocs[0])),(len(minLocs[0]),1,2)))
-				except:
-					print 'cv2.fitEllipse failed'
-					# cv2.imwrite('temp.png',img)
-					return None
-				return ellipse
 	def cropImage(self,img,cropSize):
 		xLo = self.xPixel - cropSize
 		xHi = self.xPixel + cropSize
 		yLo = self.yPixel - cropSize
 		yHi = self.yPixel + cropSize
 		return [img[yLo:yHi,xLo:xHi],xLo,yLo]
-	def search(self,img,imageNum):
+	def search(self,img,ptParams):
 		if self.lost:
-			searchSize = 5
+			searchSize = 3
 		else:
 			searchSize = 3
-		if self.first:
-			searchSize = 1
-			self.first = False
 		img,xLo,yLo = self.cropImage(img=img,cropSize=searchSize*self.radiusPixel)
-		self.ellipse = self.getDarkEllipse(img=img,imageNum=imageNum)
-		if self.ellipse!=None:
-			self.ellipse = ((self.ellipse[0][0]+xLo,self.ellipse[0][1]+yLo),self.ellipse[1],self.ellipse[2])
-			self.lost = False
-			self.x = self.ellipse[0][0]
-			self.y = self.ellipse[0][1]
-			self.major = self.ellipse[1][0]
-			self.minor = self.ellipse[1][1]
-			self.angle = self.ellipse[2]
-			self.xPixel = int(self.x)
-			self.yPixel = int(self.y)
-			self.radius = (self.ellipse[1][0]+self.ellipse[1][1])/4
-			self.radiusPixel = int(self.radius)
+		img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
+# 		start = time.time()*1000
+		center_x, center_y, size_width, size_height, angle = PupilTrackerPythonWrapper.findPupil(img, int(self.radius/2), int(self.radius*1.5), ptParams['CannyBlur'], ptParams['CannyThreshold1'], ptParams['CannyThreshold2'], ptParams['StarburstPoints'], ptParams['PercentageInliers'], ptParams['InlierIterations'], ptParams['ImageAwareSupport'], ptParams['EarlyTerminationPercentage'], ptParams['EarlyRejection'], ptParams['Seed'])		
+# 		print time.time()*1000-start
+		self.ellipse = ((center_x+xLo,center_y+yLo),(size_width,size_height),angle)
+		self.lost = False
+		self.x = self.ellipse[0][0]
+		self.y = self.ellipse[0][1]
+		self.major = self.ellipse[1][0]
+		self.minor = self.ellipse[1][1]
+		self.angle = self.ellipse[2]
+		self.xPixel = int(self.x)
+		self.yPixel = int(self.y)
+		if size_width>size_height:
+			self.radius = size_width/2.0
+		else:
+			self.radius = size_height/2.0
+		self.radiusPixel = int(self.radius)
 	def checkSearch(self):
 		self.medianRadius = numpy.median(self.radii)
 		self.critRadius = 10*((numpy.median((self.radii-self.medianRadius)**2))**.5)
@@ -108,18 +79,18 @@ class dotObj:
 				self.SDs.append(self.obsSD)
 			if len(self.SDs)>=300:
 				self.SDs.pop()
-	def update(self,img,imageNum,fid=None):
+	def update(self,img,ptParams,fid=None):
 		lastPixels = [self.xPixel,self.yPixel,self.radiusPixel]
 		self.blink = False
 		self.lost = True
 		if self.isFid:
-			self.search(img=img,imageNum=imageNum)
+			self.search(img=img,ptParams=ptParams)
 		else:
 			self.checkSD(img=img,fid=fid)
 			if self.blink:
 				self.xPixel,self.yPixel,self.radiusPixel = lastPixels
 			else:
-				self.search(img=img,imageNum=imageNum)
+				self.search(img=img,ptParams=ptParams)
 				if self.lost:
 					self.xPixel,self.yPixel,self.radiusPixel = lastPixels
 				else:

@@ -93,6 +93,17 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 	blinkSliderSize = blinkSliderBottom - blinkSliderTop
 	blinkCriterionPosition = blinkSliderBottom - blinkSliderSize*blinkCriterion	
 	#initialize variables
+	ptParams = {}
+	ptParams['CannyBlur'] = 3
+	ptParams['CannyThreshold1'] = 30
+	ptParams['CannyThreshold2'] = 50
+	ptParams['StarburstPoints'] = 0
+	ptParams['PercentageInliers'] = 50
+	ptParams['InlierIterations'] = 1
+	ptParams['ImageAwareSupport'] = True
+	ptParams['EarlyTerminationPercentage'] = 95
+	ptParams['EarlyRejection'] = True
+	ptParams['Seed'] = -1
 	saccadeSoundWaiting = False
 	lastSaccadeSoundTime = 0
 	autoBoxOn = False
@@ -240,7 +251,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 						#initialize right
 						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=blinkCriterion))
 			for i in range(len(dotList)): #update the dots given the new image
-				dotList[i].update(img=image,imageNum=imageNum,fid=dotList[0])
+				dotList[i].update(img=image,ptParams=ptParams,fid=dotList[0])
 			blink = False
 			saccade = False
 			if len(dotList)==3:
@@ -296,13 +307,12 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 					if definingFidFinderBox:
 						cv2.circle(image,(fidFinderBoxX,fidFinderBoxY),fidFinderBoxSize,color=(255,0,0,255),thickness=1)
 			for dot in dotList:
-				xPixel = dot.xPixel/previewDownsize
-				yPixel = dot.yPixel/previewDownsize
-				size = dot.radiusPixel/previewDownsize
+				ellipse = ((dot.ellipse[0][0]/previewDownsize,dot.ellipse[0][1]/previewDownsize),(dot.ellipse[1][0]/previewDownsize,dot.ellipse[1][1]/previewDownsize),dot.ellipse[2])
 				if dot.blink:
-					cv2.circle(image,(xPixel,yPixel),size,color=(0,0,255,255),thickness=1)
+					dotColor = (0,0,255,255)
 				else:
-					cv2.circle(image,(xPixel,yPixel),size,color=(0,255,0,255),thickness=1)
+					dotColor = (0,255,0,255)
+				cv2.ellipse(image,ellipse,color=dotColor,thickness=1)
 			if autoBoxOn:
 				# cv2.rectangle(image,(previewWindow.size[0]-autoTextSurf.w,0),(previewWindow.size[0],autoTextSurf.h),(0,255,0,255),1)
 				cv2.rectangle(image,(0,0),(autoTextSurf.w,autoTextSurf.h),(0,255,0,255),1)
