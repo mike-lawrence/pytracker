@@ -48,11 +48,18 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 	font = sdl2.sdlttf.TTF_OpenFont('./pytracker/Resources/DejaVuSans.ttf', fontSize)
 	#initialize video
 	sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
-	previewWindow = sdl2.ext.Window("test",size=(camRes[0]/previewDownsize,camRes[1]/previewDownsize),position=previewLoc,flags=sdl2.SDL_WINDOW_SHOWN)
+	previewWindow = sdl2.ext.Window("Preview",size=(camRes[0]/previewDownsize,camRes[1]/previewDownsize),position=previewLoc,flags=sdl2.SDL_WINDOW_SHOWN)
 	previewWindowSurf = sdl2.SDL_GetWindowSurface(previewWindow.window)
 	previewWindowArray = sdl2.ext.pixels3d(previewWindowSurf.contents)
 	sdl2.ext.fill(previewWindowSurf.contents,sdl2.pixels.SDL_Color(r=255, g=255, b=255, a=255))
 	previewWindow.refresh()
+	lastRefreshTime = time.time()
+	settingsWindow = sdl2.ext.Window("Settings",size=(camRes[0]/previewDownsize,camRes[1]/previewDownsize),position=[previewLoc[0]+camRes[0]/previewDownsize+1,previewLoc[1]])
+	settingsWindowSurf = sdl2.SDL_GetWindowSurface(settingsWindow.window)
+	settingsWindowArray = sdl2.ext.pixels3d(settingsWindowSurf.contents)
+	sdl2.ext.fill(settingsWindowSurf.contents,sdl2.pixels.SDL_Color(r=0, g=0, b=0, a=255))
+	settingsWindow.hide()
+	settingsWindow.refresh()
 	faceCascade = cv2.CascadeClassifier('./pytracker/Resources/cascades/haarcascade_frontalface_alt2.xml')
 	eyeLeftCascade = cv2.CascadeClassifier('./pytracker/Resources/cascades/LEye18x12.1.xml')
 	eyeRightCascade = cv2.CascadeClassifier('./pytracker/Resources/cascades/REye18x12.1.xml')
@@ -83,37 +90,75 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 			yLoc = (yLocLeft+yLocRight)/2
 			# print [xLoc,yLoc,dotList[1].x2,dotList[1].y2,dotList[2].x2,dotList[2].y2]
 		return [xLoc,yLoc]
-	autoTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Auto',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
-	manTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Manual',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
-	calTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Calibrate',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents	
-	blinkCriterion = .75
-	blinkTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,str(int(blinkCriterion*100)),sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
-	blinkSliderTop = int(autoTextSurf.h*2.5)
-	blinkSliderBottom = previewWindow.size[1]-int(calTextSurf.h*1.5)
-	blinkSliderSize = blinkSliderBottom - blinkSliderTop
-	blinkCriterionPosition = blinkSliderBottom - blinkSliderSize*blinkCriterion	
+	previewInFocus = True
+	settingsInFocus = False
+	blinkValue = 75
 	#initialize variables
-	ptParams = {}
-	ptParams['CannyBlur'] = 3
-	ptParams['CannyThreshold1'] = 30
-	ptParams['CannyThreshold2'] = 50
-	ptParams['StarburstPoints'] = 0
-	ptParams['PercentageInliers'] = 50
-	ptParams['InlierIterations'] = 1
-	ptParams['ImageAwareSupport'] = True
-	ptParams['EarlyTerminationPercentage'] = 95
-	ptParams['EarlyRejection'] = True
-	ptParams['Seed'] = -1
+	class clickableText:
+		def __init__(self,x,y,text,rightJustified=False,valueText=''):
+			self.x = x
+			self.y = y
+			self.text = text
+			self.rightJustified = rightJustified
+			self.valueText = valueText
+			self.isActive = False
+			self.clicked = False
+			self.updateSurf()
+		def updateSurf(self):
+			if self.isActive:
+				self.surf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,self.text+self.valueText,sdl2.pixels.SDL_Color(r=0, g=255, b=255, a=255),previewWindow.size[0]).contents
+			else:
+				self.surf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,self.text+self.valueText,sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
+		def checkIfActive(self,event):
+			if self.rightJustified:
+				xLeft = self.x - self.surf.w
+				xRight = self.x
+			else:
+				xLeft = self.x
+				xRight = self.x + self.surf.w
+			if (event.button.x>xLeft) & (event.button.x<xRight) & (event.button.y>self.y) & (event.button.y<(self.y+fontSize)):
+				self.isActive = True
+			else:
+				self.isActive = False
+			self.updateSurf()
+		def draw(self,targetWindowSurf):
+			if self.rightJustified:
+				sdl2.SDL_BlitSurface(self.surf, None, targetWindowSurf, sdl2.SDL_Rect(self.x-self.surf.w,self.y,self.surf.w,self.surf.h))
+			else:
+				sdl2.SDL_BlitSurface(self.surf, None, targetWindowSurf, sdl2.SDL_Rect(self.x,self.y,self.surf.w,self.surf.h))
+	class settingText(clickableText):
+		def __init__(self,value,x,y,text,rightJustified=False):
+			self.value = value
+			self.valueText = str(value)
+			clickableText.__init__(self,x,y,text,rightJustified,self.valueText)
+		def addValue(self,toAdd):
+			self.valueText = self.valueText+toAdd
+			self.updateSurf()
+		def delValue(self):
+			if self.valueText!='':
+				self.valueText = self.valueText[0:(len(self.valueText)-1)]
+				self.updateSurf()
+		def finalizeValue(self):
+			try:
+				self.value = int(self.valueText)
+			except:
+				print 'Non-numeric value entered!'
+	settingsDict = {}
+	settingsDict['blink'] = settingText(value=75,x=fontSize,y=fontSize,text='Blink (0-100) = ')
+	settingsDict['blur'] = settingText(value=3,x=fontSize,y=fontSize*2,text='Blur (0-; odd only) = ')
+	settingsDict['low'] = settingText(value=30,x=fontSize,y=fontSize*3,text='Low (0-High) = ')
+	settingsDict['high'] = settingText(value=50,x=fontSize,y=fontSize*4,text='High (Low-100) = ')
+	settingsDict['in'] = settingText(value=50,x=fontSize,y=fontSize*5,text='Inlier % (0-100) = ')
+	settingsDict['early'] = settingText(value=95,x=fontSize,y=fontSize*6,text='Early % (0-100) = ')
+	clickableTextDict = {}
+	clickableTextDict['manual'] = clickableText(x=0,y=0,text='Manual')
+	clickableTextDict['auto'] = clickableText(x=0,y=fontSize,text='Auto')
+	clickableTextDict['calibrate'] = clickableText(x=0,y=previewWindow.size[1]-fontSize,text='Calibrate')
+	clickableTextDict['settings'] = clickableText(x=previewWindow.size[0],y=0,text='Settings',rightJustified=True)
+	clickableTextDict['lag'] = clickableText(x=previewWindow.size[0],y=previewWindow.size[1]-fontSize*2,text='Lag: ',rightJustified=True)
+	clickableTextDict['f2f'] = clickableText(x=previewWindow.size[0],y=previewWindow.size[1]-fontSize,text='Frame-to-frame: ',rightJustified=True)
 	saccadeSoundWaiting = False
 	lastSaccadeSoundTime = 0
-	autoBoxOn = False
-	manBoxOn = False
-	calBoxOn = False
-	mouseInAutoText = False
-	mouseInManText = False
-	mouseInCalText = False
-	mouseInBlinkText = False
-	blinkTextButtonDown = False
 	lastTime = 0
 	dotList = []
 	displayLagList = []
@@ -138,87 +183,131 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 		#process input
 		sdl2.SDL_PumpEvents()
 		for event in sdl2.ext.get_events():
-			if event.type==sdl2.SDL_KEYDOWN:
-				key = sdl2.SDL_GetKeyName(event.key.keysym.sym).lower()
-				if key=='escape': #exit
-					exitSafely()
-			if event.type==sdl2.SDL_MOUSEMOTION:
-				if clickingForDots:
-					if definingFidFinderBox:
-						fidFinderBoxSize = abs(fidFinderBoxX - (previewWindow.size[0]-event.button.x) )
-				else:
-					autoBoxOn = False
-					manBoxOn = False
-					calBoxOn = False
-					mouseInAutoText = False
-					mouseInManText = False
-					mouseInCalText = False
-					mouseInBlinkText = False
-					if ( event.button.x > (previewWindow.size[0]-autoTextSurf.w) ) & ( event.button.x < previewWindow.size[0] ) & ( event.button.y > 0 ) & ( event.button.y < autoTextSurf.h ):
-						autoBoxOn = True
-						mouseInAutoText = True
-					elif ( event.button.x > (previewWindow.size[0]-manTextSurf.w) ) & ( event.button.x < previewWindow.size[0] ) & ( event.button.y > autoTextSurf.h ) & ( event.button.y < (autoTextSurf.h+manTextSurf.h) ):
-						manBoxOn = True
-						mouseInManText = True
-					elif ( event.button.x > (previewWindow.size[0]-calTextSurf.w) ) & ( event.button.x < previewWindow.size[0] ) & ( event.button.y > (previewWindow.size[1]-calTextSurf.h) ) & ( event.button.y < previewWindow.size[1] ):
-						calBoxOn = True
-						mouseInCalText = True
-					elif ( event.button.x > previewWindow.size[0]-fontSize-blinkTextSurf.w ) & ( event.button.x < previewWindow.size[0]-fontSize ) & ( event.button.y > blinkCriterionPosition-blinkTextSurf.h/2 ) & ( event.button.y < blinkCriterionPosition+blinkTextSurf.h/2 ) :
-						mouseInBlinkText = True
-						if blinkTextButtonDown:
-							blinkCriterion = ( ( blinkSliderBottom - event.button.y ) * 1.0 / blinkSliderSize )
-							if blinkCriterion>1:
-								blinkCriterion=1
-							elif blinkCriterion<0:
-								blinkCriterion=0
-							blinkTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,str(int(blinkCriterion*100)),sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
-							blinkCriterionPosition = blinkSliderBottom - blinkSliderSize*blinkCriterion
-							for i in range(len(dotList)):
-								dotList[i].blinkCriterion = blinkCriterion
-			if event.type==sdl2.SDL_MOUSEBUTTONUP:
-				if not clickingForDots:
-					if blinkTextButtonDown:
-						blinkTextButtonDown = False
-			if event.type==sdl2.SDL_MOUSEBUTTONDOWN:
-				if clickingForDots:
-					if clickingForFid:
-						if not definingFidFinderBox:
-							definingFidFinderBox = True
-							fidFinderBoxX = previewWindow.size[0]-event.button.x
-							fidFinderBoxY = event.button.y
-							fidFinderBoxSize = 0
-						else:
-							definingFidFinderBox = False
-							clickingForFid = False
-							fidFinderBoxSize = abs(fidFinderBoxX - (previewWindow.size[0]-event.button.x) )
-							dotList.append(pytracker.dotObj.dotObj(name='fid',isFid=True,xPixel=fidFinderBoxX * previewDownsize,yPixel=fidFinderBoxY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkCriterion))
+			if event.type==sdl2.SDL_WINDOWEVENT:
+				targetWindow = sdl2.SDL_GetWindowFromID(event.window.windowID)
+				title = sdl2.SDL_GetWindowTitle(targetWindow)
+				# if event.window.event==sdl2.SDL_WINDOWEVENT_FOCUS_GAINED:
+				# 	print title + "focused"
+				# if event.window.event==sdl2.SDL_WINDOWEVENT_ENTER:
+				# 	print title + " entered"
+				# elif event.window.event==sdl2.SDL_WINDOWEVENT_FOCUS_LOST:
+				# 	print title + " lost focus"
+				if event.window.event==sdl2.SDL_WINDOWEVENT_LEAVE:
+					if title=='Preview':
+						previewInFocus = False
+						settingsInFocus = True
+				if (event.window.event==sdl2.SDL_WINDOWEVENT_FOCUS_GAINED) or (event.window.event==sdl2.SDL_WINDOWEVENT_ENTER):
+					if title=='Preview':
+						previewInFocus = True
+						settingsInFocus = False
+					elif title=='Settings':
+						previewInFocus = False
+						settingsInFocus = True
+				elif (event.window.event==sdl2.SDL_WINDOWEVENT_CLOSE):
+					if title=='Preview':
+						exitSafely()
+					elif title=='Settings':
+						previewInFocus = True
+						settingsInFocus = False
+						settingsWindow.hide()
+						previewWindow.show()
+			elif settingsInFocus:
+				# if event.type==sdl2.SDL_MOUSEBUTTONUP:
+				# 	if blinkTextButtonDown:
+				# 		blinkTextButtonDown = False
+				# if event.type==sdl2.SDL_MOUSEBUTTONDOWN:
+				# 	if mouseInBlinkText:
+				# 		blinkTextButtonDown = True
+				if event.type==sdl2.SDL_MOUSEMOTION:
+					alreadyClicked = False
+					for setting in settingsDict:
+						if (settingsDict[setting].isActive) and (settingsDict[setting].clicked):
+							alreadyClicked = True
+					if not alreadyClicked:
+						for setting in settingsDict:
+							settingsDict[setting].checkIfActive(event)
+				elif event.type==sdl2.SDL_MOUSEBUTTONDOWN:
+					alreadyClicked = False
+					for setting in settingsDict:
+						if (settingsDict[setting].isActive) and (settingsDict[setting].clicked):
+							alreadyClicked = True
+					if not alreadyClicked:
+						for setting in settingsDict:
+							if settingsDict[setting].isActive:
+								settingsDict[setting].clicked = True
+				elif event.type==sdl2.SDL_KEYDOWN:
+					key = sdl2.SDL_GetKeyName(event.key.keysym.sym).lower()
+					if key == 'backspace':
+						for setting in settingsDict:
+							if (settingsDict[setting].isActive) and (settingsDict[setting].clicked):
+								settingsDict[setting].delValue()
+					elif key=='return':
+						for setting in settingsDict:
+							if (settingsDict[setting].isActive) and (settingsDict[setting].clicked):
+								settingsDict[setting].finalizeValue()
+								settingsDict[setting].clicked = False
 					else:
-						clickX = (previewWindow.size[0]-event.button.x)
-						clickY = event.button.y
-						if len(dotList)==1:
-							dotList.append(pytracker.dotObj.dotObj(name = 'left',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkCriterion))
+						for setting in settingsDict:
+							if (settingsDict[setting].isActive) and (settingsDict[setting].clicked):
+								settingsDict[setting].addValue(key)
+			elif previewInFocus:
+				if event.type==sdl2.SDL_KEYDOWN:
+					key = sdl2.SDL_GetKeyName(event.key.keysym.sym).lower()
+					if key=='escape': #exit
+						exitSafely()
+				if event.type==sdl2.SDL_MOUSEMOTION:
+						if clickingForDots:
+							clickableTextDict['manual'].isActive = True #just making sure
+							if definingFidFinderBox:
+								fidFinderBoxSize = abs(fidFinderBoxX - (previewWindow.size[0]-event.button.x) )
 						else:
-							dotList.append(pytracker.dotObj.dotObj(name = 'right',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkCriterion))
-							clickingForDots = False
-				else:
-					if mouseInBlinkText:
-						blinkTextButtonDown = True
-					elif mouseInAutoText:
-						waitingforHaar = False
-						doHaar = True #triggers haar detection for next frame
-						dotList = [] 
-					elif mouseInManText:
-						clickingForDots = True
-						clickingForFid = True
-						definingFidFinderBox = False
-						dotList = []
-					elif mouseInCalText:
-						doneCalibration = False
-						calibrator = pytracker.calibrationClass(timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,mirrorDownSize,calibrationDotSizeInDegrees,manualCalibrationOrder)
-						calibrator.start()
-						calibrating = True
-						checkCalibrationStopTime = False
-						queueDataToCalibrator = False
+							for clickableText in clickableTextDict:
+								if not (clickableText in ['lag','f2f']):
+									clickableTextDict[clickableText].checkIfActive(event)
+				if event.type==sdl2.SDL_MOUSEBUTTONDOWN:
+					if clickingForDots:
+						if clickingForFid:
+							if not definingFidFinderBox:
+								definingFidFinderBox = True
+								fidFinderBoxX = previewWindow.size[0]-event.button.x
+								fidFinderBoxY = event.button.y
+								fidFinderBoxSize = 0
+							else:
+								definingFidFinderBox = False
+								clickingForFid = False
+								fidFinderBoxSize = abs(fidFinderBoxX - (previewWindow.size[0]-event.button.x) )
+								dotList.append(pytracker.dotObj.dotObj(name='fid',isFid=True,xPixel=fidFinderBoxX * previewDownsize,yPixel=fidFinderBoxY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkValue/100.0))
+						else:
+							clickX = (previewWindow.size[0]-event.button.x)
+							clickY = event.button.y
+							if len(dotList)==1:
+								dotList.append(pytracker.dotObj.dotObj(name = 'left',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkValue/100.0))
+							else:
+								dotList.append(pytracker.dotObj.dotObj(name = 'right',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkValue/100.0))
+								clickingForDots = False
+								manTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Manual',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
+					else:
+						if clickableTextDict['settings'].isActive:
+							if (sdl2.SDL_GetWindowFlags( settingsWindow.window ) & sdl2.SDL_WINDOW_SHOWN):
+								settingsWindow.hide()
+							else:
+								settingsWindow.show()
+						elif clickableTextDict['auto'].isActive:
+							waitingforHaar = False
+							doHaar = True #triggers haar detection for next frame
+							dotList = [] 
+						elif clickableTextDict['manual'].isActive:
+							clickingForDots = True
+							clickingForFid = True
+							definingFidFinderBox = False
+							dotList = []
+						elif clickableTextDict['calibrate'].isActive:
+							doneCalibration = False
+							calibrator = pytracker.calibrationClass(timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,mirrorDownSize,calibrationDotSizeInDegrees,manualCalibrationOrder)
+							calibrator.start()
+							calibrating = True
+							checkCalibrationStopTime = False
+							queueDataToCalibrator = False
 		#check for images from the camera
 		if not camera.qFrom.empty():
 			imageNum,imageTime,image = camera.qFrom.get()
@@ -245,12 +334,23 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 						eyeLeftX,eyeLeftY,eyeLeftW,eyeLeftH = rescaleBiggestHaar(detected=detectedEyeLefts,scale=eyeDetectionScale,addToX=faceX,addToY=faceY)
 						eyeRightX,eyeRightY,eyeRightW,eyeRightH = rescaleBiggestHaar(detected=detectedEyeRights,scale=eyeDetectionScale,addToX=faceX+faceW/2,addToY=faceY)
 						#initialize fid
-						dotList.append(pytracker.dotObj.dotObj(isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=blinkCriterion))
+						dotList.append(pytracker.dotObj.dotObj(isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=blinkValue/100.0))
 						#initialize left
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=blinkCriterion))
+						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=blinkValue/100.0))
 						#initialize right
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=blinkCriterion))
+						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=blinkValue/100.0))
 			for i in range(len(dotList)): #update the dots given the new image
+				ptParams = {}
+				ptParams['CannyBlur'] = settingsDict['blur'].value
+				ptParams['CannyThreshold1'] = settingsDict['low'].value
+				ptParams['CannyThreshold2'] = settingsDict['high'].value
+				ptParams['StarburstPoints'] = 0
+				ptParams['PercentageInliers'] = settingsDict['in'].value
+				ptParams['InlierIterations'] = 1
+				ptParams['ImageAwareSupport'] = True
+				ptParams['EarlyTerminationPercentage'] = settingsDict['early'].value
+				ptParams['EarlyRejection'] = True
+				ptParams['Seed'] = -1
 				dotList[i].update(img=image,ptParams=ptParams,fid=dotList[0])
 			blink = False
 			saccade = False
@@ -313,32 +413,29 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 				else:
 					dotColor = (0,255,0,255)
 				cv2.ellipse(image,ellipse,color=dotColor,thickness=1)
-			if autoBoxOn:
-				# cv2.rectangle(image,(previewWindow.size[0]-autoTextSurf.w,0),(previewWindow.size[0],autoTextSurf.h),(0,255,0,255),1)
-				cv2.rectangle(image,(0,0),(autoTextSurf.w,autoTextSurf.h),(0,255,0,255),1)
-			if manBoxOn:
-				cv2.rectangle(image,(0,autoTextSurf.h),(manTextSurf.w,autoTextSurf.h+manTextSurf.h),(0,255,0,255),1)
-			if calBoxOn:
-				cv2.rectangle(image,(0,previewWindow.size[1]-calTextSurf.h),(calTextSurf.w,previewWindow.size[1]),(0,255,0,255),1)
-			cv2.rectangle(image,(0,blinkSliderTop),(fontSize,blinkSliderBottom),(255,0,0,255),1)
-			cv2.rectangle(image,(0,int(blinkCriterionPosition)-2),(fontSize,int(blinkCriterionPosition)+2),(255,0,0,255),-1)
 			image = numpy.rot90(image)
 			previewWindowArray[:,:,0:3] = image
 			frameToFrameTimeList.append(imageTime-lastTime)
 			lastTime = imageTime
 			displayLagList.append(getTime()-imageTime)
-			displayLag = str(int(numpy.median(displayLagList)*1000))
-			frameToFrameTime = str(int(numpy.median(frameToFrameTimeList)*1000))
 			if len(displayLagList)>30:
 				displayLagList.pop(0)
 				frameToFrameTimeList.pop(0)
-			sdl2.SDL_BlitSurface(autoTextSurf, None, previewWindowSurf, sdl2.SDL_Rect(previewWindow.size[0]-autoTextSurf.w,0,autoTextSurf.w,autoTextSurf.h))
-			sdl2.SDL_BlitSurface(manTextSurf, None, previewWindowSurf, sdl2.SDL_Rect(previewWindow.size[0]-manTextSurf.w,autoTextSurf.h,manTextSurf.w,manTextSurf.h))
-			sdl2.SDL_BlitSurface(calTextSurf, None, previewWindowSurf, sdl2.SDL_Rect(previewWindow.size[0]-calTextSurf.w,previewWindow.size[1]-calTextSurf.h,calTextSurf.w,calTextSurf.h))
-			sdl2.SDL_BlitSurface(blinkTextSurf, None, previewWindowSurf, sdl2.SDL_Rect(previewWindow.size[0]-fontSize-blinkTextSurf.w,int(blinkCriterionPosition-blinkTextSurf.h/2),blinkTextSurf.w,blinkTextSurf.h))
-			timeSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Lag: '+displayLag+'\r'+'f2f: '+frameToFrameTime+'\r',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
-			sdl2.SDL_BlitSurface(timeSurf, None, previewWindowSurf, sdl2.SDL_Rect(0,0,timeSurf.w,timeSurf.h))
+			clickableTextDict['lag'].valueText = str(int(numpy.median(displayLagList)*1000))
+			clickableTextDict['lag'].updateSurf()
+			clickableTextDict['f2f'].valueText = str(int(numpy.median(frameToFrameTimeList)*1000))
+			clickableTextDict['f2f'].updateSurf()
+			for clickableText in clickableTextDict:
+				clickableTextDict[clickableText].draw(previewWindowSurf)
 			previewWindow.refresh()
+			thisRefreshTime = time.time()
+			# print (thisRefreshTime - lastRefreshTime)*1000
+			lastRefreshTime = thisRefreshTime
+			if (sdl2.SDL_GetWindowFlags( settingsWindow.window ) & sdl2.SDL_WINDOW_SHOWN):
+				sdl2.ext.fill(settingsWindowSurf.contents,sdl2.pixels.SDL_Color(r=0, g=0, b=0, a=255))
+				for setting in settingsDict:
+					settingsDict[setting].draw(settingsWindowSurf)
+				settingsWindow.refresh()
 			if calibrating:
 				if not calibrator.qFrom.empty():
 					message = calibrator.qFrom.get()
