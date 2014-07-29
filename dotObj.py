@@ -18,34 +18,43 @@ class dotObj:
 		self.blinkCriterion = blinkCriterion
 	def cropImage(self,img,cropSize):
 		xLo = self.xPixel - cropSize
+		if xLo<0:
+			xLo = 0
 		xHi = self.xPixel + cropSize
+		if xHi>img.shape[1]:
+			xHi = img.shape[1]
 		yLo = self.yPixel - cropSize
+		if yLo<0:
+			yLo = 0
 		yHi = self.yPixel + cropSize
-		return [img[yLo:yHi,xLo:xHi],xLo,yLo]
+		if yHi>img.shape[0]:
+			yHi = img.shape[0]
+		return [img[yLo:yHi,xLo:xHi],xLo,xHi,yLo,yHi]
 	def search(self,img,ptParams):
-		if self.lost:
-			searchSize = 3
+		if self.radiusPixel<10:
+			searchSize = 30
 		else:
-			searchSize = 3
-		img,xLo,yLo = self.cropImage(img=img,cropSize=searchSize*self.radiusPixel)
+			searchSize = 3*self.radiusPixel
+		img,xLo,xHi,yLo,yHi = self.cropImage(img=img,cropSize=searchSize)
 		img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
-# 		start = time.time()*1000
 		center_x, center_y, size_width, size_height, angle = PupilTrackerPythonWrapper.findPupil(img, int(self.radius/2), int(self.radius*1.5), ptParams['CannyBlur'], ptParams['CannyThreshold1'], ptParams['CannyThreshold2'], ptParams['StarburstPoints'], ptParams['PercentageInliers'], ptParams['InlierIterations'], ptParams['ImageAwareSupport'], ptParams['EarlyTerminationPercentage'], ptParams['EarlyRejection'], ptParams['Seed'])		
-# 		print time.time()*1000-start
-		self.ellipse = ((center_x+xLo,center_y+yLo),(size_width,size_height),angle)
-		self.lost = False
-		self.x = self.ellipse[0][0]
-		self.y = self.ellipse[0][1]
-		self.major = self.ellipse[1][0]
-		self.minor = self.ellipse[1][1]
-		self.angle = self.ellipse[2]
-		self.xPixel = int(self.x)
-		self.yPixel = int(self.y)
-		if size_width>size_height:
-			self.radius = size_width/2.0
+		if size_width == 0:
+			self.lost = True
 		else:
-			self.radius = size_height/2.0
-		self.radiusPixel = int(self.radius)
+			self.ellipse = ((center_x+xLo,center_y+yLo),(size_width,size_height),angle)
+			self.lost = False
+			self.x = self.ellipse[0][0]
+			self.y = self.ellipse[0][1]
+			self.major = self.ellipse[1][0]
+			self.minor = self.ellipse[1][1]
+			self.angle = self.ellipse[2]
+			self.xPixel = int(self.x)
+			self.yPixel = int(self.y)
+			if size_width>size_height:
+				self.radius = size_width/2.0
+			else:
+				self.radius = size_height/2.0
+			self.radiusPixel = int(self.radius)
 	def checkSearch(self):
 		self.medianRadius = numpy.median(self.radii)
 		self.critRadius = 10*((numpy.median((self.radii-self.medianRadius)**2))**.5)

@@ -149,7 +149,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 	settingsDict['low'] = settingText(value=30,x=fontSize,y=fontSize*3,text='Low (0-High) = ')
 	settingsDict['high'] = settingText(value=50,x=fontSize,y=fontSize*4,text='High (Low-100) = ')
 	settingsDict['in'] = settingText(value=50,x=fontSize,y=fontSize*5,text='Inlier % (0-100) = ')
-	settingsDict['early'] = settingText(value=95,x=fontSize,y=fontSize*6,text='Early % (0-100) = ')
+	settingsDict['early'] = settingText(value=10,x=fontSize,y=fontSize*6,text='Early % (0-100) = ')
 	clickableTextDict = {}
 	clickableTextDict['manual'] = clickableText(x=0,y=0,text='Manual')
 	clickableTextDict['auto'] = clickableText(x=0,y=fontSize,text='Auto')
@@ -352,6 +352,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 				ptParams['EarlyRejection'] = True
 				ptParams['Seed'] = -1
 				dotList[i].update(img=image,ptParams=ptParams,fid=dotList[0])
+				# print 'ok'
 			blink = False
 			saccade = False
 			if len(dotList)==3:
@@ -408,7 +409,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 						cv2.circle(image,(fidFinderBoxX,fidFinderBoxY),fidFinderBoxSize,color=(255,0,0,255),thickness=1)
 			for dot in dotList:
 				ellipse = ((dot.ellipse[0][0]/previewDownsize,dot.ellipse[0][1]/previewDownsize),(dot.ellipse[1][0]/previewDownsize,dot.ellipse[1][1]/previewDownsize),dot.ellipse[2])
-				if dot.blink:
+				if dot.blink or dot.lost:
 					dotColor = (0,0,255,255)
 				else:
 					dotColor = (0,255,0,255)
