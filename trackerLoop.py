@@ -92,7 +92,6 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 		return [xLoc,yLoc]
 	previewInFocus = True
 	settingsInFocus = False
-	blinkValue = 75
 	#initialize variables
 	class clickableText:
 		def __init__(self,x,y,text,rightJustified=False,valueText=''):
@@ -146,10 +145,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 	settingsDict = {}
 	settingsDict['blink'] = settingText(value=75,x=fontSize,y=fontSize,text='Blink (0-100) = ')
 	settingsDict['blur'] = settingText(value=3,x=fontSize,y=fontSize*2,text='Blur (0-; odd only) = ')
-	settingsDict['low'] = settingText(value=30,x=fontSize,y=fontSize*3,text='Low (0-High) = ')
-	settingsDict['high'] = settingText(value=50,x=fontSize,y=fontSize*4,text='High (Low-100) = ')
-	settingsDict['in'] = settingText(value=50,x=fontSize,y=fontSize*5,text='Inlier % (0-100) = ')
-	settingsDict['early'] = settingText(value=10,x=fontSize,y=fontSize*6,text='Early % (0-100) = ')
+	settingsDict['filter'] = settingText(value=30,x=fontSize,y=fontSize*3,text='Filter (0-; odd only) = ')
 	clickableTextDict = {}
 	clickableTextDict['manual'] = clickableText(x=0,y=0,text='Manual')
 	clickableTextDict['auto'] = clickableText(x=0,y=fontSize,text='Auto')
@@ -276,14 +272,14 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 								definingFidFinderBox = False
 								clickingForFid = False
 								fidFinderBoxSize = abs(fidFinderBoxX - (previewWindow.size[0]-event.button.x) )
-								dotList.append(pytracker.dotObj.dotObj(name='fid',isFid=True,xPixel=fidFinderBoxX * previewDownsize,yPixel=fidFinderBoxY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkValue/100.0))
+								dotList.append(pytracker.dotObj.dotObj(name='fid',isFid=True,xPixel=fidFinderBoxX * previewDownsize,yPixel=fidFinderBoxY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 						else:
 							clickX = (previewWindow.size[0]-event.button.x)
 							clickY = event.button.y
 							if len(dotList)==1:
-								dotList.append(pytracker.dotObj.dotObj(name = 'left',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkValue/100.0))
+								dotList.append(pytracker.dotObj.dotObj(name = 'left',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 							else:
-								dotList.append(pytracker.dotObj.dotObj(name = 'right',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=blinkValue/100.0))
+								dotList.append(pytracker.dotObj.dotObj(name = 'right',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 								clickingForDots = False
 								manTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Manual',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
 					else:
@@ -334,24 +330,13 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 						eyeLeftX,eyeLeftY,eyeLeftW,eyeLeftH = rescaleBiggestHaar(detected=detectedEyeLefts,scale=eyeDetectionScale,addToX=faceX,addToY=faceY)
 						eyeRightX,eyeRightY,eyeRightW,eyeRightH = rescaleBiggestHaar(detected=detectedEyeRights,scale=eyeDetectionScale,addToX=faceX+faceW/2,addToY=faceY)
 						#initialize fid
-						dotList.append(pytracker.dotObj.dotObj(isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=blinkValue/100.0))
+						dotList.append(pytracker.dotObj.dotObj(isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 						#initialize left
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=blinkValue/100.0))
+						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 						#initialize right
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=blinkValue/100.0))
+						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 			for i in range(len(dotList)): #update the dots given the new image
-				ptParams = {}
-				ptParams['CannyBlur'] = settingsDict['blur'].value
-				ptParams['CannyThreshold1'] = settingsDict['low'].value
-				ptParams['CannyThreshold2'] = settingsDict['high'].value
-				ptParams['StarburstPoints'] = 0
-				ptParams['PercentageInliers'] = settingsDict['in'].value
-				ptParams['InlierIterations'] = 1
-				ptParams['ImageAwareSupport'] = True
-				ptParams['EarlyTerminationPercentage'] = settingsDict['early'].value
-				ptParams['EarlyRejection'] = True
-				ptParams['Seed'] = -1
-				dotList[i].update(img=image,ptParams=ptParams,fid=dotList[0])
+				dotList[i].update(img=image,fid=dotList[0],blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value)
 				# print 'ok'
 			blink = False
 			saccade = False
