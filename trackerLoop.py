@@ -145,7 +145,7 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 	settingsDict = {}
 	settingsDict['blink'] = settingText(value=75,x=fontSize,y=fontSize,text='Blink (0-100) = ')
 	settingsDict['blur'] = settingText(value=3,x=fontSize,y=fontSize*2,text='Blur (0-; odd only) = ')
-	settingsDict['filter'] = settingText(value=30,x=fontSize,y=fontSize*3,text='Filter (0-; odd only) = ')
+	settingsDict['filter'] = settingText(value=3,x=fontSize,y=fontSize*3,text='Filter (0-; odd only) = ')
 	clickableTextDict = {}
 	clickableTextDict['manual'] = clickableText(x=0,y=0,text='Manual')
 	clickableTextDict['auto'] = clickableText(x=0,y=fontSize,text='Auto')
@@ -250,7 +250,11 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 				if event.type==sdl2.SDL_KEYDOWN:
 					key = sdl2.SDL_GetKeyName(event.key.keysym.sym).lower()
 					if key=='escape': #exit
-						exitSafely()
+						# exitSafely()
+						clickingForDots = False
+						clickingForFid = False
+						definingFidFinderBox = False
+						dotList = []
 				if event.type==sdl2.SDL_MOUSEMOTION:
 						if clickingForDots:
 							clickableTextDict['manual'].isActive = True #just making sure
@@ -277,9 +281,9 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 							clickX = (previewWindow.size[0]-event.button.x)
 							clickY = event.button.y
 							if len(dotList)==1:
-								dotList.append(pytracker.dotObj.dotObj(name = 'left',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+								dotList.append(pytracker.dotObj.dotObj(name = 'left',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=dotList[0].radiusPixel,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 							else:
-								dotList.append(pytracker.dotObj.dotObj(name = 'right',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+								dotList.append(pytracker.dotObj.dotObj(name = 'right',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=dotList[1].radiusPixel,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 								clickingForDots = False
 								manTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Manual',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
 					else:
@@ -330,11 +334,11 @@ def loop(qTo,qFrom,camIndex,camRes,previewDownsize,previewLoc,faceDetectionScale
 						eyeLeftX,eyeLeftY,eyeLeftW,eyeLeftH = rescaleBiggestHaar(detected=detectedEyeLefts,scale=eyeDetectionScale,addToX=faceX,addToY=faceY)
 						eyeRightX,eyeRightY,eyeRightW,eyeRightH = rescaleBiggestHaar(detected=detectedEyeRights,scale=eyeDetectionScale,addToX=faceX+faceW/2,addToY=faceY)
 						#initialize fid
-						dotList.append(pytracker.dotObj.dotObj(isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+						dotList.append(pytracker.dotObj.dotObj(name='fid',isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 						#initialize left
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+						dotList.append(pytracker.dotObj.dotObj(name='left',isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 						#initialize right
-						dotList.append(pytracker.dotObj.dotObj(isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+						dotList.append(pytracker.dotObj.dotObj(name='right',isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 			for i in range(len(dotList)): #update the dots given the new image
 				dotList[i].update(img=image,fid=dotList[0],blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value)
 				# print 'ok'

@@ -12,6 +12,8 @@ class dotObj:
 		self.radiusPixel = radiusPixel
 		self.radius = radiusPixel
 		self.first = True
+		self.lost = False
+		self.blink = False
 		self.radii = []
 		self.SDs = []
 		self.lostCount = 0
@@ -73,7 +75,7 @@ class dotObj:
 		if self.first:
 			self.first = False
 		img,xLo,xHi,yLo,yHi = self.cropImage(img=img,cropSize=searchSize*self.radiusPixel)
-		self.ellipse = self.getDarkEllipse(img=img,imageNum=imageNum)
+		self.ellipse = self.getDarkEllipse(img=img)
 		if self.ellipse!=None:
 			self.ellipse = ((self.ellipse[0][0]+xLo,self.ellipse[0][1]+yLo),self.ellipse[1],self.ellipse[2])
 			self.lost = False
@@ -125,7 +127,10 @@ class dotObj:
 				self.blink = False
 			if len(self.SDs)>=300:
 				self.SDs.pop()
-	def update(self,img,fid=None):
+	def update(self,img,fid,blinkCriterion,blurSize,filterSize):
+		self.blinkCriterion = blinkCriterion
+		self.blurSize = blurSize
+		self.filterSize = filterSize
 		lastPixels = [self.xPixel,self.yPixel,self.radiusPixel]
 		if self.isFid:
 			self.search(img=img)
