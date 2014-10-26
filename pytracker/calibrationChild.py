@@ -20,8 +20,6 @@
 
 import numpy #for image and display manipulation
 import scipy.misc #for image and display manipulation
-from PIL import Image #for creating visual stimuli
-import aggdraw #for creating visual stimuli
 import math #for trig and other math stuff
 import sys #for quitting
 import sdl2
