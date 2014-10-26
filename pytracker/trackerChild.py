@@ -23,8 +23,7 @@
 # mirrorDisplayPosition = [0,0]
 # mirrorDownSize = 2
 # manualCalibrationOrder = True
-# calibrationDotSizeInDegrees = 1
-# saccadeAlertSizeInDegrees = 1
+# calibrationDotSizeInDegrees = .5
 
 
 import fileForker
@@ -93,14 +92,14 @@ class settingText(clickableText):
 
 #define a class for dots
 class dotObj:
-	def __init__(self,name,isFid,xPixel,yPixel,radiusPixel,blinkCriterion,blurSize,filterSize):
+	def __init__(self,name,isFid,fid,xPixel,yPixel,radiusPixel,blinkCriterion,blurSize,filterSize):
 		self.name = name
 		self.isFid = isFid
-		self.xPixel = xPixel
-		self.yPixel = yPixel
-		self.radiusPixel = radiusPixel
+		self.x = xPixel
+		self.y = yPixel
 		self.radius = radiusPixel
 		self.first = True
+		self.last = [self.x,self.y,self.radius]
 		self.lost = False
 		self.blinkHappened = False
 		self.radii = []
@@ -109,6 +108,19 @@ class dotObj:
 		self.blinkCriterion = blinkCriterion
 		self.blurSize = blurSize
 		self.filterSize = filterSize
+		self.setPixels()
+		if not self.isFid:
+			self.makeRelativeToFid(fid)
+	def setPixels(self):
+		self.xPixel = int(self.x)
+		self.yPixel = int(self.y)
+		self.radiusPixel = int(self.radius)
+		return None
+	def makeRelativeToFid(self,fid):
+		self.x2 = (self.x-fid.x)/fid.radius
+		self.y2 = (self.y-fid.y)/fid.radius
+		self.radius2 = self.radius/fid.radius
+		return None
 	def getDarkEllipse(self,img):
 		#if not self.isFid:
 		#	#cv2.imwrite(self.name + "_" + "%.2d" % imageNum + "_raw.png" , img)
@@ -156,7 +168,9 @@ class dotObj:
 			yHi = img.shape[0]
 		return [img[yLo:yHi,xLo:xHi],xLo,xHi,yLo,yHi]
 	def search(self,img):
-		if self.lost or self.first:
+		if self.first and self.isFid:
+			searchSize = 1
+		elif self.lost:
 			searchSize = 5
 		else:
 			searchSize = 3
@@ -172,10 +186,8 @@ class dotObj:
 			self.major = self.ellipse[1][0]
 			self.minor = self.ellipse[1][1]
 			self.angle = self.ellipse[2]
-			self.xPixel = int(self.x)
-			self.yPixel = int(self.y)
 			self.radius = (self.ellipse[1][0]+self.ellipse[1][1])/4
-			self.radiusPixel = int(self.radius)
+			self.setPixels()
 		else:
 			self.lost = True
 	def checkSearch(self):
@@ -195,10 +207,6 @@ class dotObj:
 				self.radii.append(self.radius2)
 			if len(self.radii)>=300:
 				self.radii.pop()
-	def makeRelativeToFid(self,fid):
-		self.x2 = (self.x-fid.x)/fid.radius
-		self.y2 = (self.y-fid.y)/fid.radius
-		self.radius2 = self.radius/fid.radius
 	def checkSD(self,img,fid):
 		self.obsSD = numpy.std(self.cropImage(img=img,cropSize=5*fid.radiusPixel)[0])
 		self.medianSD = numpy.median(self.SDs)
@@ -219,22 +227,28 @@ class dotObj:
 		self.blinkCriterion = blinkCriterion
 		self.blurSize = blurSize
 		self.filterSize = filterSize
-		lastPixels = [self.xPixel,self.yPixel,self.radiusPixel]
+		self.last = [self.x,self.y,self.radius]
 		if self.isFid:
 			self.search(img=img)
 		else:
 			self.checkSD(img=img,fid=fid) #alters the value of self.blinkHappened, amongst other things
 			if self.blinkHappened:
-				self.xPixel,self.yPixel,self.radiusPixel = lastPixels
+				self.x,self.y,self.radius = self.last
+				self.setPixels()
+				self.makeRelativeToFid(fid)
 			else:
 				self.search(img=img) #alters the value of self.lost, amongst other things
 				if self.lost:
-					self.xPixel,self.yPixel,self.radiusPixel = lastPixels
+					self.x,self.y,self.radius = self.last
+					self.setPixels()
+					self.makeRelativeToFid(fid)
 				else:
 					self.makeRelativeToFid(fid=fid)
 					self.checkSearch() #alters the value of self.lost, among other things
 					if self.lost:
-						self.xPixel,self.yPixel,self.radiusPixel = lastPixels
+						self.x,self.y,self.radius = self.last
+						self.setPixels()
+						self.makeRelativeToFid(fid)
 		if self.lost and not self.blinkHappened:
 			self.lostCount += 1
 		else:
@@ -276,27 +290,6 @@ def exitSafely():
 def rescaleBiggestHaar(detected,scale,addToX=0,addToY=0):
 	x,y,w,h = detected[numpy.argmax([numpy.sqrt(w*w+h*h) for x,y,w,h in detected])]
 	return [x*scale+addToX,y*scale+addToY,w*scale,h*scale]
-
-#define a function to compute gaze location from image and calibration coeficients
-def getGazeLoc(dotList,coefs,last):
-	xCoefLeft,xCoefRight,yCoefLeft,yCoefRight = coefs
-	if dotList[1].lost:
-		xLoc = xCoefRight[0] + xCoefRight[1]*dotList[2].x2 + xCoefRight[2]*dotList[2].y2 + xCoefRight[3]*dotList[2].y2*dotList[2].x2
-		yLoc = yCoefRight[0] + yCoefRight[1]*dotList[2].x2 + yCoefRight[2]*dotList[2].y2 + yCoefRight[3]*dotList[2].y2*dotList[2].x2
-	elif dotList[2].lost:
-		xLoc = xCoefLeft[0] + xCoefLeft[1]*dotList[1].x2 + xCoefLeft[2]*dotList[1].y2 + xCoefLeft[3]*dotList[2].y2*dotList[1].x2
-		yLoc = yCoefLeft[0] + yCoefLeft[1]*dotList[1].x2 + yCoefLeft[2]*dotList[1].y2 + yCoefLeft[3]*dotList[2].y2*dotList[1].x2
-	elif dotList[1].lost and dotList[2].lost:
-		xLoc = last[0]
-		yLoc = last[1]
-	else:
-		xLocLeft = xCoefLeft[0] + xCoefLeft[1]*dotList[1].x2 + xCoefLeft[2]*dotList[1].y2 + xCoefLeft[3]*dotList[2].y2*dotList[1].x2
-		yLocLeft = yCoefLeft[0] + yCoefLeft[1]*dotList[1].x2 + yCoefLeft[2]*dotList[1].y2 + yCoefLeft[3]*dotList[2].y2*dotList[1].x2
-		xLocRight = xCoefRight[0] + xCoefRight[1]*dotList[2].x2 + xCoefRight[2]*dotList[2].y2 + xCoefRight[3]*dotList[2].y2*dotList[2].x2
-		yLocRight = yCoefRight[0] + yCoefRight[1]*dotList[2].x2 + yCoefRight[2]*dotList[2].y2 + yCoefRight[3]*dotList[2].y2*dotList[2].x2
-		xLoc = (xLocLeft+xLocRight)/2
-		yLoc = (yLocLeft+yLocRight)/2
-	return [xLoc,yLoc]
 
 
 ########
@@ -356,6 +349,8 @@ settingsDict = {}
 settingsDict['blink'] = settingText(value=75,x=fontSize,y=fontSize,text='Blink (0-100) = ')
 settingsDict['blur'] = settingText(value=3,x=fontSize,y=fontSize*2,text='Blur (0-; odd only) = ')
 settingsDict['filter'] = settingText(value=3,x=fontSize,y=fontSize*3,text='Filter (0-; odd only) = ')
+settingsDict['saccade0'] = settingText(value=50,x=fontSize,y=fontSize*4,text='Saccade (0-) = ')
+settingsDict['saccade'] = settingText(value=1,x=fontSize,y=fontSize*5,text='Calibrated Saccade (0-) = ')
 
 #create some text UIs
 clickableTextDict = {}
@@ -371,6 +366,7 @@ previewInFocus = True
 settingsInFocus = False
 lastTime = 0
 dotList = []
+lastLocs = [None,None]
 displayLagList = []
 frameToFrameTimeList = []
 doHaar = False
@@ -381,7 +377,7 @@ doSounds = True
 queueDataToParent = False
 
 #set dummy calibration coefficients (yields untransformed pixel locs)
-calibrationCoefs = [[0,1,0,0],[0,0,1,0],[0,1,0,0],[0,0,1,0]]
+calibrationCoefs = [[0,1,0,0],[0,1,0,0],[0,0,1,0],[0,0,1,0]]
 
 ########
 # Initialize camera
@@ -508,14 +504,14 @@ while True:
 							definingFidFinderBox = False
 							clickingForFid = False
 							fidFinderBoxSize = abs(fidFinderBoxX - (previewWindow.size[0]-event.button.x) )
-							dotList.append(pytracker.dotObj.dotObj(name='fid',isFid=True,xPixel=fidFinderBoxX * previewDownsize,yPixel=fidFinderBoxY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+							dotList.append(dotObj(name='fid',isFid=True,fid=None,xPixel=fidFinderBoxX * previewDownsize,yPixel=fidFinderBoxY * previewDownsize,radiusPixel=fidFinderBoxSize * previewDownsize,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 					else:
 						clickX = (previewWindow.size[0]-event.button.x)
 						clickY = event.button.y
 						if len(dotList)==1:
-							dotList.append(pytracker.dotObj.dotObj(name = 'left',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=dotList[0].radiusPixel,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+							dotList.append(dotObj(name = 'left',isFid=False,fid=dotList[0],xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=dotList[0].radiusPixel,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 						else:
-							dotList.append(pytracker.dotObj.dotObj(name = 'right',isFid=False,xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=dotList[1].radiusPixel,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+							dotList.append(dotObj(name = 'right',isFid=False,fid=dotList[0],xPixel=clickX * previewDownsize,yPixel=clickY * previewDownsize,radiusPixel=dotList[1].radiusPixel,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 							clickingForDots = False
 							manTextSurf = sdl2.sdlttf.TTF_RenderText_Blended_Wrapped(font,'Manual',sdl2.pixels.SDL_Color(r=0, g=0, b=255, a=255),previewWindow.size[0]).contents
 				else:
@@ -535,7 +531,7 @@ while True:
 						dotList = []
 					elif clickableTextDict['calibrate'].isActive:
 						doneCalibration = False
-						calibrationChild = fileForker.childClass(childFile='calibrationProcess')
+						calibrationChild = fileForker.childClass(childFile='calibrationChild')
 						calibrationChild.initDict['timestampMethod'] = timestampMethod
 						calibrationChild.initDict['viewingDistance'] = viewingDistance
 						calibrationChild.initDict['stimDisplayWidth'] = stimDisplayWidth
@@ -574,11 +570,11 @@ while True:
 				eyeLeftX,eyeLeftY,eyeLeftW,eyeLeftH = rescaleBiggestHaar(detected=detectedEyeLefts,scale=eyeDetectionScale,addToX=faceX,addToY=faceY)
 				eyeRightX,eyeRightY,eyeRightW,eyeRightH = rescaleBiggestHaar(detected=detectedEyeRights,scale=eyeDetectionScale,addToX=faceX+faceW/2,addToY=faceY)
 				#initialize fid
-				dotList.append(pytracker.dotObj.dotObj(name='fid',isFid=True,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+				dotList.append(dotObj(name='fid',isFid=True,fid=None,xPixel=faceX+faceW/2,yPixel=(faceY+(eyeLeftY+eyeRightY)/2)/2,radiusPixel=(eyeLeftH+eyeRightH)/4,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 				#initialize left
-				dotList.append(pytracker.dotObj.dotObj(name='left',isFid=False,xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+				dotList.append(dotObj(name='left',isFid=False,fid=dotList[0],xPixel=eyeLeftX+eyeLeftW/2,yPixel=eyeLeftY+eyeLeftH/2,radiusPixel=eyeLeftH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 				#initialize right
-				dotList.append(pytracker.dotObj.dotObj(name='right',isFid=False,xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
+				dotList.append(dotObj(name='right',isFid=False,fid=dotList[0],xPixel=eyeRightX+eyeRightW/2,yPixel=eyeRightY+eyeRightH/2,radiusPixel=eyeRightH/2,blinkCriterion=settingsDict['blink'].value/100.0,blurSize=settingsDict['blur'].value,filterSize=settingsDict['filter'].value))
 
 	#update the dots given the latest image
 	for i in range(len(dotList)): 
@@ -599,13 +595,30 @@ while True:
 		elif dotList[1].blinkHappened and dotList[2].blinkHappened:
 			blinkHappened = True
 		else:
-			xLoc,yLoc = getGazeLoc(dotList,calibrationCoefs,lastLocs)
-			if len(lastLocs)==2:
+			#compute gaze location to check for saccades
+			xCoefLeft,xCoefRight,yCoefLeft,yCoefRight = calibrationCoefs
+			if dotList[1].lost: #left missing, use right
+				xLoc = xCoefRight[0] + xCoefRight[1]*dotList[2].x2 + xCoefRight[2]*dotList[2].y2 + xCoefRight[3]*dotList[2].y2*dotList[2].x2
+				yLoc = yCoefRight[0] + yCoefRight[1]*dotList[2].x2 + yCoefRight[2]*dotList[2].y2 + yCoefRight[3]*dotList[2].y2*dotList[2].x2
+			elif dotList[2].lost: #right missing, use left
+				xLoc = xCoefLeft[0] + xCoefLeft[1]*dotList[1].x2 + xCoefLeft[2]*dotList[1].y2 + xCoefLeft[3]*dotList[2].y2*dotList[1].x2
+				yLoc = yCoefLeft[0] + yCoefLeft[1]*dotList[1].x2 + yCoefLeft[2]*dotList[1].y2 + yCoefLeft[3]*dotList[2].y2*dotList[1].x2
+			elif dotList[1].lost and dotList[2].lost: #both missing, use last
+				xLoc = lastLocs[0]
+				yLoc = lastLocs[1]
+			else: #both present, use average
+				xLocLeft = xCoefLeft[0] + xCoefLeft[1]*dotList[1].x2 + xCoefLeft[2]*dotList[1].y2 + xCoefLeft[3]*dotList[1].y2*dotList[1].x2
+				yLocLeft = yCoefLeft[0] + yCoefLeft[1]*dotList[1].x2 + yCoefLeft[2]*dotList[1].y2 + yCoefLeft[3]*dotList[1].y2*dotList[1].x2
+				xLocRight = xCoefRight[0] + xCoefRight[1]*dotList[2].x2 + xCoefRight[2]*dotList[2].y2 + xCoefRight[3]*dotList[2].y2*dotList[2].x2
+				yLocRight = yCoefRight[0] + yCoefRight[1]*dotList[2].x2 + yCoefRight[2]*dotList[2].y2 + yCoefRight[3]*dotList[2].y2*dotList[2].x2
+				xLoc = (xLocLeft+xLocRight)/2.0
+				yLoc = (yLocLeft+yLocRight)/2.0
+			if None not in lastLocs:
 				locDiff = ( ((xLoc-lastLocs[0])**2) + ((yLoc-lastLocs[1])**2) )**.5
 				if doneCalibration:
-					saccadeCriterion = saccadeAlertSize
+					saccadeCriterion = settingsDict['saccade'].value
 				else:
-					saccadeCriterion = dotList[0].radius*2 #heuristic for uncalibrated
+					saccadeCriterion = settingsDict['saccade0'].value/100.0
 				if locDiff>saccadeCriterion:
 					saccadeHappened = True
 			lastLocs = [xLoc,yLoc]
