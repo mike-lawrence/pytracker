@@ -27,6 +27,7 @@
 # saccadeAlertSizeInDegrees = 1
 
 
+import fileForker
 import numpy
 import cv2
 import scipy.ndimage.filters
@@ -319,7 +320,7 @@ if (timestampMethod==0) or (timestampMethod==1):
 		def getTime():
 			return sdl2.SDL_GetTicks()/1000.0
 elif timestampMethod==2:
-	#use time.time()
+	#use time.time
 	import time
 	getTime = time.time
 
@@ -335,7 +336,7 @@ previewWindowSurf = sdl2.SDL_GetWindowSurface(previewWindow.window)
 previewWindowArray = sdl2.ext.pixels3d(previewWindowSurf.contents)
 sdl2.ext.fill(previewWindowSurf.contents,sdl2.pixels.SDL_Color(r=255, g=255, b=255, a=255))
 previewWindow.refresh()
-lastRefreshTime = time.time()
+lastRefreshTime = getTime()
 
 #initialize the settings window
 settingsWindow = sdl2.ext.Window("Settings",size=(camRes[0]/previewDownsize,camRes[1]/previewDownsize),position=[previewLoc[0]+camRes[0]/previewDownsize+1,previewLoc[1]])
@@ -534,11 +535,20 @@ while True:
 						dotList = []
 					elif clickableTextDict['calibrate'].isActive:
 						doneCalibration = False
-						calibrator = pytracker.calibrationClass(timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,mirrorDownSize,calibrationDotSizeInDegrees,manualCalibrationOrder)
-						calibrator.start()
+						calibrationChild = fileForker.childClass(childFile='calibrationProcess')
+						calibrationChild.initDict['timestampMethod'] = timestampMethod
+						calibrationChild.initDict['viewingDistance'] = viewingDistance
+						calibrationChild.initDict['stimDisplayWidth'] = stimDisplayWidth
+						calibrationChild.initDict['stimDisplayRes'] = stimDisplayRes
+						calibrationChild.initDict['stimDisplayPosition'] = stimDisplayPosition
+						calibrationChild.initDict['mirrorDisplayPosition'] = mirrorDisplayPosition
+						calibrationChild.initDict['mirrorDownSize'] = mirrorDownSize
+						calibrationChild.initDict['calibrationDotSizeInDegrees'] = calibrationDotSizeInDegrees
+						calibrationChild.initDict['manualCalibrationOrder'] = manualCalibrationOrder
+						calibrationChild.start()
 						calibrating = True
 						checkCalibrationStopTime = False
-						queueDataToCalibrator = False
+						queueDataToCalibrationChild = False
 
 	#do haar detection if requested
 	if doHaar: 
@@ -588,7 +598,7 @@ while True:
 				dotList = []
 		elif dotList[1].blinkHappened and dotList[2].blinkHappened:
 			blinkHappened = True
-		else
+		else:
 			xLoc,yLoc = getGazeLoc(dotList,calibrationCoefs,lastLocs)
 			if len(lastLocs)==2:
 				locDiff = ( ((xLoc-lastLocs[0])**2) + ((yLoc-lastLocs[1])**2) )**.5
@@ -600,7 +610,7 @@ while True:
 					saccadeHappened = True
 			lastLocs = [xLoc,yLoc]
 			if queueDataToParent:
-				qFrom.put(['eyeData',[str.format('{0:.3f}',imageTime),xLoc,yLoc,dotlist[1].radius2,dotlist[2].radius2,,saccadeHappened,blinkHappened,dotList[1].lost,dotList[2].lost,dotList[1].blinkHappened,dotList[2].blinkHappened]])
+				qFrom.put(['eyeData',[str.format('{0:.3f}',imageTime),xLoc,yLoc,dotlist[1].radius2,dotlist[2].radius2,saccadeHappened,blinkHappened,dotList[1].lost,dotList[2].lost,dotList[1].blinkHappened,dotList[2].blinkHappened]])
 
 	#play sounds as necessary
 	if doSounds:
@@ -640,7 +650,7 @@ while True:
 	for clickableText in clickableTextDict:
 		clickableTextDict[clickableText].draw(previewWindowSurf)
 	previewWindow.refresh()
-	thisRefreshTime = time.time()
+	thisRefreshTime = getTime()
 	# print (thisRefreshTime - lastRefreshTime)*1000
 	lastRefreshTime = thisRefreshTime
 	if (sdl2.SDL_GetWindowFlags( settingsWindow.window ) & sdl2.SDL_WINDOW_SHOWN):
@@ -651,10 +661,10 @@ while True:
 
 	#calibration stuff
 	if calibrating:
-		if not calibrator.qFrom.empty():
-			message = calibrator.qFrom.get()
+		if not calibrationChild.qFrom.empty():
+			message = calibrationChild.qFrom.get()
 			if message=='startQueing':
-				queueDataToCalibrator = True
+				queueDataToCalibrationChild = True
 			elif message[0]=='stopQueing':
 				calibrationStopTime = message[1]
 				checkCalibrationStopTime = True
@@ -662,8 +672,8 @@ while True:
 				calibrationCoefs = message[1]
 				calibrating = False
 				doneCalibration = True
-				calibrator.stop()
-				del calibrator
+				calibrationChild.stop()
+				del calibrationChild
 				lastLocs = []
 				qFrom.put(['calibrationComplete',message])
 				queueDataToParent = True
@@ -671,12 +681,12 @@ while True:
 				print message
 		if checkCalibrationStopTime:
 			if imageTime>calibrationStopTime:
-				queueDataToCalibrator = False
-				calibrator.qTo.put('doneQueing')
+				queueDataToCalibrationChild = False
+				calibrationChild.qTo.put('doneQueing')
 				checkCalibrationStopTime = False
-		if queueDataToCalibrator:
+		if queueDataToCalibrationChild:
 			if len(dotList)>0:
-				calibrator.qTo.put([imageTime,dotList[1].x2,dotList[1].y2,dotList[2].x2,dotList[2].y2])
+				calibrationChild.qTo.put([imageTime,dotList[1].x2,dotList[1].y2,dotList[2].x2,dotList[2].y2])
 
 
 
