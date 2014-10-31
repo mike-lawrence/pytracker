@@ -1,6 +1,6 @@
 if __name__ == '__main__':
 	import fileForker
-	trackerChild = fileForker.childClass(childFile='pytracker/trackerChild')
+	trackerChild = fileForker.childClass(childFile='pytracker/trackerChild.py')
 	trackerChild.initDict['camIndex'] = 0
 	trackerChild.initDict['camRes'] = [1920,1080]
 	trackerChild.initDict['previewDownsize'] = 2
