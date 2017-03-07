@@ -7,10 +7,12 @@ Currently only has accounting for head movements in x,y,z planes only; translati
 
 ##Software dependencies
 
+ - pysdl2 (https://pysdl2.readthedocs.org)
  - numpy (http://numpy.org)
  - scipy (http://scipy.org)
  - OpenCV (http://opencv.org)
  - billiard (https://github.com/celery/billiard)
+ - fileForker (https://github.com/mike-lawrence/fileForker)
 
 
 ##Hardware dependencies
@@ -22,36 +24,7 @@ Finally, the code expects that the user has a black dot on their head, placed be
 
 ##Example usage
 
-```python
-if __name__ == '__main__':
-	import pytracker
-	import time
-	camIndex = 0
-	camRes = [1920,1080]
-	previewDownsize = 2
-	faceDetectionScale = 4
-	eyeDetectionScale = 2
-	timestampMethod = 2
-	viewingDistance = 53.0
-	stimDisplayWidth = 59.5
-	stimDisplayRes = [1024,768]
-	stimDisplayPosition = [0,0]
-	mirrorDisplayPosition = [1025,0] #i.e. put the window mirroring the stim display on the next monitor
-	mirrorDownSize = 2
-	previewLoc = [1024,0] #i.e. put the window mirroring the stim display on the next monitor
-	manualCalibrationOrder = False
-	calibrationDotSizeInDegrees = 1
-	saccadeAlertSizeInDegrees = 3
-	tracker = pytracker.trackerClass(camIndex=camIndex,camRes=camRes,previewDownsize=previewDownsize,previewLoc=previewLoc,faceDetectionScale=faceDetectionScale,eyeDetectionScale=eyeDetectionScale,timestampMethod=timestampMethod,viewingDistance=viewingDistance,stimDisplayWidth=stimDisplayWidth,stimDisplayRes=stimDisplayRes,stimDisplayPosition=stimDisplayPosition,mirrorDisplayPosition=mirrorDisplayPosition,mirrorDownSize=mirrorDownSize,manualCalibrationOrder = manualCalibrationOrder, calibrationDotSizeInDegrees=calibrationDotSizeInDegrees,saccadeAlertSizeInDegrees=saccadeAlertSizeInDegrees)
-	tracker.start()
-	tracker.start()
-	while True:
-		time.sleep(1)
-		if not tracker.qFrom.empty():
-			message = tracker.qFrom.get()
-			if message=='done':
-				break
-```
+See `example.py`
 
 If the full face is visible, you should be able to click "Auto" to automatically acquire the pupils and fiduciary mark. If the "Auto" fails, click "Manual" then: 
 1. click the center of the fiduciary mark
@@ -62,5 +35,5 @@ If the full face is visible, you should be able to click "Auto" to automatically
 
 Regardless of whether using "Auto" or "Manual", you should instruct the subject to stare straight ahead and refrain from blinking or moving during the acquisition. 
 
-Following acquisition, ask the subject to blink intermittently and move their eyes intermittently. If either the blinks aren't detected or the eyes get lost during movements, try moving the slider on the right of the preview window to different values.
+Following acquisition, ask the subject to blink intermittently and move their eyes intermittently. If either the blinks aren't detected or the eyes get lost during movements, try clicking "settings" and modifying the parameters there.
 

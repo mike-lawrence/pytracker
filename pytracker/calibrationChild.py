@@ -1,30 +1,45 @@
-def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayRes,stimDisplayPosition,mirrorDisplayPosition,mirrorDownSize,calibrationDotSizeInDegrees,manualCalibrationOrder):
-	# 	class dummyQTo:
-	# 		def empty(self):
-	# 			return True
-	# 	
-	# 	class dummyQFrom:
-	# 		def put(self,message):
-	# 			print message
-	# 	
-	# 	qTo = dummyQTo()
-	# 	qFrom = dummyQFrom()
-	# 	viewingDistance = 100
-	# 	stimDisplayWidth = 100
-	# 	stimDisplayRes = (2560,1440)
-	# 	stimDisplayPosition = (-2560,0)
-	# 	mirrorDisplayPosition = (0,0)
-	# 	calibrationDotSizeInDegrees = 1
-	# 	timestampMethod = 0
+# class dummyQTo:
+# 	def empty(self):
+# 		return True
+
+# class dummyQFrom:
+# 	def put(self,message):
+# 		print message
+
+# qTo = dummyQTo()
+# qFrom = dummyQFrom()
+# viewingDistance = 100
+# stimDisplayWidth = 100
+# stimDisplayRes = (2560,1440)
+# stimDisplayPosition = (-2560,0)
+# mirrorDisplayPosition = (0,0)
+# calibrationDotSizeInDegrees = 1
+# timestampMethod = 0
+# mirrorDownSize
+# manualCalibrationOrder
+
+def calibrationChildFunction(
+qTo
+, qFrom
+, viewingDistance = 100
+, stimDisplayWidth = 100
+, stimDisplayRes = (2560,1440)
+, stimDisplayPosition = (-2560,0)
+, mirrorDisplayPosition = (0,0)
+, calibrationDotSizeInDegrees = 1
+, timestampMethod = 0
+, mirrorDownSize = 2
+, manualCalibrationOrder = True
+):
 	import numpy #for image and display manipulation
 	import scipy.misc #for image and display manipulation
-	from PIL import Image #for creating visual stimuli
-	import aggdraw #for creating visual stimuli
 	import math #for trig and other math stuff
 	import sys #for quitting
 	import sdl2
 	import sdl2.ext
 	import random
+
+	#set the getTime function
 	if (timestampMethod==0) or (timestampMethod==1):
 		#initialize timer
 		sdl2.SDL_Init(sdl2.SDL_INIT_TIMER)
@@ -37,12 +52,11 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 			#use the SDL_GetTicks timer
 			def getTime():
 				return sdl2.SDL_GetTicks()/1000.0
-			
 	elif timestampMethod==2:
 		#use time.time()
 		import time
 		getTime = time.time
-	
+
 	#initialize video
 	sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
 	sdl2.SDL_SetHint("SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS","0")
@@ -83,7 +97,7 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 		y, x = numpy.ogrid[-radius: radius, -radius: radius]
 		index = numpy.logical_and( (x**2 + y**2) <= (radius**2) , (x**2 + y**2) >= ((radius/4)**2) )
 		stimDisplayArray[ (cy-radius):(cy+radius) , (cx-radius):(cx+radius) , ][index] = [255,255,255,255]
-	
+
 	calibrationLocations = dict()
 	calibrationLocations['CENTER'] = numpy.array([0,0])
 	calibrationLocations['N'] = numpy.array([0,int(0-stimDisplayRes[1]/2.0+calibrationDotSize)])
@@ -103,19 +117,19 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 	# calibrationLocations['SE2'] = numpy.array([int((0+stimDisplayRes[0]/2.0-calibrationDotSize)/2.0),int((0+stimDisplayRes[1]/2.0-calibrationDotSize)/2.0)])
 	# calibrationLocations['NW2'] = numpy.array([int((0-stimDisplayRes[0]/2.0+calibrationDotSize)/2.0),int((0-stimDisplayRes[1]/2.0+calibrationDotSize)/2.0)])
 	# calibrationLocations['SW2'] = numpy.array([int((0-stimDisplayRes[0]/2.0+calibrationDotSize)/2.0),int((0+stimDisplayRes[1]/2.0-calibrationDotSize)/2.0)])
-	
+
 	#define a function that will kill everything safely
 	def exitSafely():
 		qFrom.put(['stopQueing',getTime()])
 		sdl2.ext.quit()
 		sys.exit()
-	
+
 	#define a function that waits for a given duration to pass
 	def simpleWait(duration):
 		start = getTime()
 		while getTime() < (start + duration):
 			sdl2.SDL_PumpEvents()
-	
+
 	#define a function to draw a numpy array on  surface centered on given coordinates
 	def blitArray(src,dst,xOffset=0,yOffset=0):
 		x1 = dst.shape[0]/2+xOffset-src.shape[0]/2
@@ -123,14 +137,14 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 		x2 = x1+src.shape[0]
 		y2 = y1+src.shape[1]
 		dst[x1:x2,y1:y2,:] = src
-	
+
 	def blitSurf(srcSurf,dst,dstSurf,xOffset=0,yOffset=0):
 		x = dst.size[0]/2+xOffset-srcSurf.w/2
 		y = dst.size[1]/2+yOffset-srcSurf.h/2
 		sdl2.SDL_BlitSurface(srcSurf, None, dstSurf, sdl2.SDL_Rect(x,y,srcSurf.w,srcSurf.h))
 		sdl2.SDL_UpdateWindowSurface(dst.window) #should this really be here? (will it cause immediate update?)
 		# sdl2.SDL_FreeSurface(srcSurf)
-	
+
 	#define a function that waits for a response
 	def waitForResponse():
 		# sdl2.SDL_FlushEvents()
@@ -146,7 +160,7 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 						done = True
 		# sdl2.SDL_FlushEvents()
 		return response
-	
+
 	def refreshWindows():
 		stimDisplay.refresh()
 		image = stimDisplayArray[:,:,0:3]
@@ -154,10 +168,10 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 		mirrorDisplayArray[:,:,0:3] = image
 		mirrorDisplay.refresh()
 		return None
-	
+
 	def clearScreen(color):
 		sdl2.ext.fill(stimDisplaySurf.contents,color)
-	
+
 	def drawText(myText, myFont, textColor,textWidth=.9):
 		lineHeight = sdl2.sdlttf.TTF_RenderText_Blended(myFont,'T',textColor).contents.h
 		textWidthMax = int(stimDisplay.size[0])
@@ -206,7 +220,7 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 			y = int(stimDisplay.size[1]/2.0 - thisRender.h/2.0 + 1.0*thisLine/numLines*textHeight)
 			sdl2.SDL_BlitSurface(thisRender, None, stimDisplaySurf, sdl2.SDL_Rect(x,y,thisRender.w,thisRender.h))
 			sdl2.SDL_UpdateWindowSurface(stimDisplay.window) #should this really be here? (will it cause immediate update?)
-	
+
 	#define a function that prints a message on the stimDisplay while looking for user input to continue. The function returns the total time it waited
 	def showMessage(myText,lockWait=False):
 		messageViewingTimeStart = getTime()
@@ -228,7 +242,7 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 		simpleWait(0.500)
 		messageViewingTime = getTime() - messageViewingTimeStart
 		return [response,messageViewingTime]
-	
+
 	#define a function to show stimuli and collect calibration data
 	def getCalibrationData():
 		if not manualCalibrationOrder:
@@ -285,6 +299,7 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 		calibrationData = numpy.array([item for sublist in calibrationData for item in sublist])
 		calibrationData = calibrationData.reshape([len(calibrationData)/9,9])
 		return calibrationData
+
 	#define a function to compute prediciton error
 	def getErrors(calibrationData,xCoefLeft,xCoefRight,yCoefLeft,yCoefRight,leftCols,rightCols):
 		xPredsLeft = xCoefLeft[0] + xCoefLeft[1]*calibrationData[:,leftCols[1]] + xCoefLeft[2]*calibrationData[:,leftCols[2]] + xCoefLeft[3]*calibrationData[:,leftCols[3]]
@@ -323,12 +338,13 @@ def loop(qTo,qFrom,timestampMethod,viewingDistance,stimDisplayWidth,stimDisplayR
 			elif response[0]=='r':
 				done2 = True
 	exitSafely()
-# 	xFit = numpy.polyfit(obs[:,0],exp[:,0],2)
-# 	yFit = numpy.polyfit(obs[:,1],exp[:,1],2)
-# 	xError = numpy.polyval(xFit,obs[:,0])-exp[:,0]
-# 	yError = numpy.polyval(yFit,obs[:,1])-exp[:,1]
-# 	xSTD = numpy.std(xError)
-# 	ySTD = numpy.std(yError)
-# 	totError = numpy.mean(((xError**2)+(yError**2))**.5)
-# 	showMessage('Calibration results:\nx = '+xSTD+'\ny = '+ySTD+'z = '+totError)
-	
+	# 	xFit = numpy.polyfit(obs[:,0],exp[:,0],2)
+	# 	yFit = numpy.polyfit(obs[:,1],exp[:,1],2)
+	# 	xError = numpy.polyval(xFit,obs[:,0])-exp[:,0]
+	# 	yError = numpy.polyval(yFit,obs[:,1])-exp[:,1]
+	# 	xSTD = numpy.std(xError)
+	# 	ySTD = numpy.std(yError)
+	# 	totError = numpy.mean(((xError**2)+(yError**2))**.5)
+	# 	showMessage('Calibration results:\nx = '+xSTD+'\ny = '+ySTD+'z = '+totError)
+
+calibrationChildFunction(qTo,qFrom,**initDict)
